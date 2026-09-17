@@ -396,3 +396,123 @@ Task: QA review, fix stale meta stats, add selection highlight, connect mode, mo
 5. **Performance: debounce label edits** — when editing node labels, debounce the SVG re-render by 200ms
 6. **Mobile responsive** — collapsible side panel, touch-friendly zoom gestures
 7. **Rate limiting** — implement Free/Pro/Enterprise quotas on /api/v1/generate
+
+---
+Task ID: 5
+Agent: main (cron webDevReview)
+Task: Fix LLM parser "X on Y" merging bug, add mini-map, search, stats panel, debounced edits
+
+## Current Project Status Assessment
+- vizarch is production-ready from Task 4 (8→12 nodes via improved parsing, mini-map, search, stats, debounce)
+- ESLint: 0 errors, 0 warnings
+- All API routes returning 200
+- VLM rating: 9/10
+- Known issues from Task 4 worklog:
+  1. Mini-map not implemented (top priority)
+  2. Empty state for canvas (generic message)
+  3. Loading skeletons (just spinner)
+  4. Mobile layout
+  5. Large diagram performance (no debounce on label edits)
+
+## Critical Bug Found via QA
+- **LLM parser was merging "X on Y" patterns into single nodes**: The description "React frontend on Vercel, Node.js API on Lambda, PostgreSQL on RDS, Redis cache, S3 storage..." was being parsed into only 8 nodes (React frontend, Node.js API, PostgreSQL, Redis cache, S3 storage, CloudFront CDN, SNS notifications, Datadog monitoring) — DROPPING Vercel, Lambda, RDS, and ElastiCache entirely. The LLM treated "on Vercel" as a prepositional phrase describing the frontend, not as a separate hosting service.
+
+## Completed Modifications
+
+### Critical Bug Fix
+1. **Improved LLM parser prompt** (`parser.ts`)
+   - Added 5 new "CRITICAL NODE-EXTRACTION RULES" to the system prompt:
+     - Rule 7: Treat EVERY noun phrase naming a service/platform/technology as a SEPARATE node. "React frontend on Vercel" → 2 nodes (frontend + Vercel) + edge.
+     - Rule 8: Prepositions (on, via, with, using, behind) indicate TWO services connected by an edge.
+     - Rule 9: Common "X on Y" patterns to split (frontend→Vercel, API→Lambda, database→RDS, cache→ElastiCache, storage→S3).
+     - Rule 10: Verbs (queries, calls, publishes to, writes to, reads from, notifies, monitors, caches, routes to) imply directional edges.
+     - Rule 11: When in doubt, err on the side of creating a node (easier to delete than recover).
+   - Verified: same description now produces 12 nodes (was 8) including Vercel, Lambda, RDS, ElastiCache as separate nodes with connecting edges.
+
+### New Features (7)
+
+1. **Mini-map overview** (`mini-map.tsx`)
+   - 160×100px thumbnail in bottom-right corner of canvas
+   - Renders simplified diagram: colored rectangles for nodes (by type color), thin lines for edges
+   - Teal viewport rectangle shows current zoom/pan position
+   - Click anywhere on mini-map to navigate the canvas to that point
+   - "Mini-map" label in top-left corner
+   - Semi-transparent (85% opacity) with backdrop-blur
+
+2. **Node search bar** (`node-search-bar.tsx`)
+   - Floating search input at top-center of canvas
+   - Cmd/Ctrl+F to focus (standard browser search shortcut)
+   - Searches across: label, serviceName, serviceId, type, provider
+   - Shows up to 8 matches in dropdown with color dot + label + id
+   - Enter selects first match (highlights + selects the node)
+   - Escape clears and blurs
+   - Placeholder: "Search nodes… (⌘F)"
+
+3. **Diagram stats panel** (`diagram-stats-panel.tsx`)
+   - New card in right sidebar (below Customization when no node/edge selected)
+   - Top: 2 stat cards (nodes count with Server icon, edges count with ArrowRight icon)
+   - "By provider" section: horizontal progress bars (teal→emerald gradient) showing relative distribution, with counts
+   - "By type" section: compact badges with type:count
+   - "Node list" section: scrollable clickable list (max-h-32) — click to select that node. Each item shows color dot + label + id.
+
+4. **Illustrated empty state** (`diagram-canvas.tsx`)
+   - Pulsing teal circle background with Layers icon
+   - "No diagram yet" message
+   - Inline hint with styled `<kbd>` elements: "Describe your architecture above and hit ⌘/Ctrl+Enter, or pick a preset template."
+   - Max-width constrained for readability
+
+5. **Shimmer loading skeleton** (`diagram-canvas.tsx`)
+   - During LLM generation (2-7s): full-canvas shimmer overlay
+   - Three fake node rectangles positioned across the canvas with muted backgrounds
+   - Central card with spinner + "Generating diagram via Claude…" + estimated time
+   - Card has backdrop-blur + border + shadow for legibility over shimmer
+
+6. **Debounced node label & description edits** (`node-detail-panel.tsx`)
+   - Local state for label and description inputs (no longer calls updateNode on every keystroke)
+   - 250ms debounce timer before pushing to store
+   - Timer cleared on unmount / new keystroke
+   - Added description textarea (was previously read-only display)
+   - Uses React `key` prop idiom: parent passes `key={selectedNodeId}` so component remounts when selection changes, re-initializing local state
+   - Performance: typing in label input no longer triggers SVG re-render until user pauses 250ms
+
+7. **Duplicate diagram action** (`recent-diagrams-dialog.tsx`)
+   - New "Duplicate (fork)" button (Copy icon) between Open and Delete
+   - Click → fetches the original diagram, re-saves with "(copy)" suffix in title, generates new slug
+   - Refreshes the list automatically
+   - Toast confirms: `Duplicated as <new-slug>`
+
+### Styling Polish
+- Mini-map: backdrop-blur, semi-transparent, teal viewport rectangle
+- Search bar: backdrop-blur, teal focus ring, positioned top-center
+- Stats panel: gradient progress bars, icon-led stat cards, scrollable node list with hover
+- Empty state: pulsing animation, centered layout, inline kbd hints
+- Loading skeleton: shimmer animation, fake node placeholders, central status card
+- Node detail: description now editable via textarea (was read-only)
+
+## Verification Results
+- ESLint: 0 errors, 0 warnings
+- Dev server: all routes 200, no runtime errors (after fixing duplicate `matches` declaration in node-search-bar)
+- Agent Browser QA confirmed:
+  - LLM parser now produces 12 nodes (was 8) for same description ✓
+  - All 12 node labels correct: React frontend, Vercel, Node.js API, Lambda, PostgreSQL, RDS, Redis cache, ElastiCache, S3 storage, CloudFront CDN, SNS notifications, Datadog monitoring ✓
+  - Mini-map renders in bottom-right corner with viewport rectangle ✓
+  - Search bar at top-center, typing "redis" finds 1 match ✓
+  - Stats panel shows 2 provider bars (Generic, AWS) + 8 type badges + node list ✓
+  - Duplicate button in recent diagrams (DOM-verified, hover-revealed) ✓
+- VLM final rating: 9/10 ("exceptionally clean, professional, highly functional... top-tier architecture visualization tool")
+
+## Unresolved Issues / Risks
+- **Mini-map viewport rectangle is approximate**: The viewport rect uses estimated canvas dimensions (800×400) rather than measuring the actual wrap. For accurate viewport tracking, would need to pass real wrap dimensions from the canvas component to the mini-map (via store or context).
+- **Mobile layout**: Side panel still stacks below canvas on narrow screens. Touch gestures not optimized.
+- **Rate limiting**: /api/v1/generate has no Free/Pro/Enterprise quotas yet.
+- **Real-time collaboration**: WebSocket mini-service not yet implemented.
+- **Loading skeleton fake nodes**: The 3 placeholder rectangles are static positions, not reflecting actual diagram layout.
+
+## Priority Recommendations for Next Phase
+1. **Accurate mini-map viewport** — pass real wrap dimensions from canvas to mini-map so the viewport rectangle is exact
+2. **Real-time collaboration** — WebSocket via socket.io mini-service for multi-user editing
+3. **Rate limiting** — implement Free (10/day), Pro (100/day), Enterprise (custom) quotas on /api/v1/generate using in-memory counter
+4. **Mobile responsive** — collapsible side panel (toggle button in header), pinch-to-zoom on canvas
+5. **Pre-warm cache** — on server startup, pre-generate common template diagrams so first request is instant
+6. **Performance: SVG memoization** — for 100+ node diagrams, memoize the SVG string by graph hash instead of re-rendering on every state change
+7. **Version history** — track diagram revisions with diff visualization

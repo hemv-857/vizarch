@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { useDiagramStore } from "@/hooks/use-diagram-store";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -34,9 +35,40 @@ export function NodeDetailPanel() {
   const setConnectMode = useDiagramStore((s) => s.setConnectMode);
   const connectModeFromId = useDiagramStore((s) => s.connectModeFromId);
 
-  if (!graph || !selectedId) return null;
-  const node = graph.nodes.find((n) => n.id === selectedId);
-  if (!node) return null;
+  // Local state for the label input, synced with the store node but debounced on save
+  // The parent passes a `key` prop = selectedId so this component remounts when selection changes,
+  // re-initializing localLabel/localDesc from the new node.
+  const node = graph?.nodes.find((n) => n.id === selectedId);
+  const [localLabel, setLocalLabel] = useState(node?.label ?? "");
+  const [localDesc, setLocalDesc] = useState(node?.description ?? "");
+  const labelTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const descTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Debounced label save (250ms after last keystroke)
+  useEffect(() => {
+    if (localLabel === node?.label) return;
+    if (labelTimer.current) clearTimeout(labelTimer.current);
+    labelTimer.current = setTimeout(() => {
+      updateNode(selectedId!, { label: localLabel });
+    }, 250);
+    return () => {
+      if (labelTimer.current) clearTimeout(labelTimer.current);
+    };
+  }, [localLabel, selectedId, node?.label, updateNode]);
+
+  // Debounced description save
+  useEffect(() => {
+    if (localDesc === node?.description) return;
+    if (descTimer.current) clearTimeout(descTimer.current);
+    descTimer.current = setTimeout(() => {
+      updateNode(selectedId!, { description: localDesc });
+    }, 250);
+    return () => {
+      if (descTimer.current) clearTimeout(descTimer.current);
+    };
+  }, [localDesc, selectedId, node?.description, updateNode]);
+
+  if (!graph || !selectedId || !node) return null;
 
   const incoming = graph.edges.filter((e) => e.to === node.id);
   const outgoing = graph.edges.filter((e) => e.from === node.id);
@@ -82,17 +114,21 @@ export function NodeDetailPanel() {
         <div className="space-y-1.5">
           <Label className="text-[11px] text-muted-foreground">Custom label</Label>
           <Input
-            value={node.label}
-            onChange={(e) => updateNode(node.id, { label: e.target.value })}
+            value={localLabel}
+            onChange={(e) => setLocalLabel(e.target.value)}
             className="h-8 text-sm"
           />
         </div>
 
-        {node.description && (
-          <div className="rounded-md bg-muted/40 p-2 text-[11px] text-muted-foreground leading-relaxed">
-            {node.description}
-          </div>
-        )}
+        <div className="space-y-1.5">
+          <Label className="text-[11px] text-muted-foreground">Description</Label>
+          <textarea
+            value={localDesc}
+            onChange={(e) => setLocalDesc(e.target.value)}
+            className="w-full min-h-[44px] max-h-24 resize-y rounded-md border border-input bg-transparent px-2 py-1 text-[11px] leading-relaxed outline-none focus:border-teal-400 focus:ring-1 focus:ring-teal-400/30 transition"
+            placeholder="Add a description…"
+          />
+        </div>
 
         {/* Color picker */}
         <div className="space-y-1.5">

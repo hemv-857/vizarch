@@ -18,6 +18,7 @@ import { VizarchFooter } from "@/components/vizarch/footer";
 import { ServicesCatalogDialog } from "@/components/vizarch/services-catalog-dialog";
 import { ShortcutsHelpDialog } from "@/components/vizarch/shortcuts-help-dialog";
 import { RecentDiagramsDialog } from "@/components/vizarch/recent-diagrams-dialog";
+import { DiagramStatsPanel } from "@/components/vizarch/diagram-stats-panel";
 import { MetaStats } from "@/components/vizarch/meta-stats";
 import { Toaster } from "sonner";
 
@@ -91,11 +92,14 @@ export default function Home() {
           </div>
           <div className="order-2 flex flex-col gap-3 min-h-0 overflow-y-auto max-h-[calc(100vh-180px)]">
             {selectedEdgeId ? (
-              <EdgeDetailPanel />
+              <EdgeDetailPanel key={selectedEdgeId} />
             ) : selectedNodeId ? (
-              <NodeDetailPanel />
+              <NodeDetailPanel key={selectedNodeId} />
             ) : (
-              <CustomizationPanel />
+              <>
+                <CustomizationPanel />
+                <DiagramStatsPanel />
+              </>
             )}
             {store.showExport && <ExportPanel />}
           </div>

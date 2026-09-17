@@ -49,7 +49,19 @@ ${SERVICES.map((s) => `- ${s.id} (${s.name}; aliases: ${s.aliases.slice(0, 4).jo
 3. Each edge must reference an existing node id. "protocol" should be one of: https, http, grpc, postgres, mysql, redis, db, event, sqs, sns, amqp, mqtt, websocket, tcp, udp, direct. Use "direct" when no specific protocol applies.
 4. Only include nodes/edges that the user actually described. Do NOT invent extra services.
 5. If the user mentions a service that does not match any catalog entry, add it as a node with "service": "generic.microservice" and add the ambiguous term to "ambiguities".
-6. Use exactly the JSON shape above. No trailing text.`;
+6. Use exactly the JSON shape above. No trailing text.
+
+CRITICAL NODE-EXTRACTION RULES (do NOT skip nodes!):
+7. Treat EVERY noun phrase that names a service, platform, or technology as a SEPARATE node. Do NOT merge phrases like "React frontend on Vercel" into one node — instead create TWO nodes: one for the frontend ("generic.frontend", label "React frontend") and one for the hosting ("generic.vercel", label "Vercel"), then connect them with an edge (protocol "https", label "Hosted on").
+8. Prepositions like "on", "via", "with", "using", "behind" typically indicate TWO services connected by an edge. "X on Y" → node X + node Y + edge(X → Y). "X via Y" → node X + node Y + edge(X → Y, label "via").
+9. Common "X on Y" patterns to split:
+   - "React frontend on Vercel" → frontend node + Vercel node
+   - "API on Lambda" → API node + Lambda node
+   - "database on RDS" → database node + RDS node (or just RDS node if database type is ambiguous)
+   - "cache on ElastiCache" → cache node + ElastiCache node
+   - "storage on S3" → S3 node (S3 IS the storage, so one node is fine here)
+10. Verbs and action words imply edges: "queries", "calls", "publishes to", "writes to", "reads from", "notifies", "monitors", "caches", "routes to" all indicate directional edges from the subject to the object.
+11. When in doubt about whether something is a service or just a descriptor, err on the side of creating a node. It's easier to delete an extra node than to recover a missing one.`;
 
 function extractJsonBlock(text: string): string {
   // Try fenced ```json ... ```

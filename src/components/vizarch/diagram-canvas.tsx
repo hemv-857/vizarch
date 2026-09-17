@@ -15,6 +15,8 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { MiniMap } from "@/components/vizarch/mini-map";
+import { NodeSearchBar } from "@/components/vizarch/node-search-bar";
 
 export function DiagramCanvas() {
   const svg = useDiagramStore((s) => s.svg);
@@ -233,16 +235,31 @@ export function DiagramCanvas() {
       >
         {isLoading && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-muted-foreground">
-            <Loader2 className="h-6 w-6 animate-spin text-teal-600" />
-            <div className="text-sm">Generating diagram via Claude…</div>
-            <div className="text-[11px]">This may take 2-4 seconds on first call</div>
+            {/* Shimmer skeleton */}
+            <div className="absolute inset-4 rounded-lg overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-muted/50 to-transparent animate-pulse" style={{ animationDuration: "1.5s" }} />
+              {/* Fake nodes skeleton */}
+              <div className="absolute top-1/4 left-1/4 w-32 h-20 rounded-lg border border-border bg-muted/30" />
+              <div className="absolute top-1/2 left-1/2 w-32 h-20 rounded-lg border border-border bg-muted/30" />
+              <div className="absolute top-3/4 left-3/4 w-32 h-20 rounded-lg border border-border bg-muted/30" />
+            </div>
+            <div className="relative z-10 flex flex-col items-center gap-2 bg-background/80 backdrop-blur px-6 py-4 rounded-lg border border-border shadow-md">
+              <Loader2 className="h-5 w-5 animate-spin text-teal-600" />
+              <div className="text-sm font-medium text-foreground">Generating diagram via Claude…</div>
+              <div className="text-[11px]">This may take 2-7 seconds on first call</div>
+            </div>
           </div>
         )}
         {isEmpty && !error && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-muted-foreground">
-            <Layers className="h-6 w-6 opacity-50" />
-            <div className="text-sm">No diagram yet</div>
-            <div className="text-[11px]">Describe your architecture above and hit Generate</div>
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-muted-foreground">
+            <div className="relative flex h-16 w-16 items-center justify-center">
+              <div className="absolute inset-0 rounded-full bg-teal-500/10 animate-pulse" />
+              <Layers className="h-8 w-8 text-teal-600/70" />
+            </div>
+            <div className="text-sm font-medium text-foreground/80">No diagram yet</div>
+            <div className="text-[11px] max-w-xs text-center">
+              Describe your architecture above and hit <kbd className="px-1 py-0.5 rounded bg-muted border border-border text-[10px]">⌘/Ctrl</kbd>+<kbd className="px-1 py-0.5 rounded bg-muted border border-border text-[10px]">Enter</kbd>, or pick a preset template.
+            </div>
           </div>
         )}
         {svg && (
@@ -276,6 +293,12 @@ export function DiagramCanvas() {
           <span className="text-[11px] text-muted-foreground ml-2">click to select</span>
         </div>
       )}
+
+      {/* Mini-map (bottom-right corner) */}
+      {svg && <MiniMap />}
+
+      {/* Node search bar (top-center, only when diagram loaded) */}
+      {svg && !isLoading && <NodeSearchBar />}
     </div>
   );
 }

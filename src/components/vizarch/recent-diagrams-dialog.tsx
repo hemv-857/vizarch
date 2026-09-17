@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, ExternalLink, Trash2, FileBox, Clock } from "lucide-react";
+import { Loader2, ExternalLink, Trash2, FileBox, Clock, Copy } from "lucide-react";
 import { toast } from "sonner";
 
 interface SavedDiagram {
@@ -59,6 +59,38 @@ export function RecentDiagramsDialog() {
       toast.success("Diagram deleted");
     } catch (err) {
       toast.error(`Delete failed: ${(err as Error).message}`);
+    }
+  }
+
+  async function handleDuplicate(d: SavedDiagram) {
+    // Fetch the original, then re-save with a new slug
+    try {
+      const res = await fetch(`/api/diagrams/${d.slug}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const original = data.diagram;
+      const saveRes = await fetch("/api/diagrams", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: `${original.title ?? "Untitled"} (copy)`,
+          description: original.description,
+          graphJson: original.graphJson,
+          styleJson: original.styleJson,
+          svgCache: original.svgCache,
+        }),
+      });
+      if (!saveRes.ok) throw new Error(`HTTP ${saveRes.status}`);
+      const saved = await saveRes.json();
+      // Refresh list
+      const listRes = await fetch("/api/diagrams");
+      if (listRes.ok) {
+        const listData = await listRes.json();
+        setItems(listData.diagrams ?? []);
+      }
+      toast.success(`Duplicated as ${saved.diagram.slug}`);
+    } catch (err) {
+      toast.error(`Duplicate failed: ${(err as Error).message}`);
     }
   }
 
@@ -126,6 +158,15 @@ export function RecentDiagramsDialog() {
                       title="Open"
                     >
                       <ExternalLink className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-7 p-0"
+                      onClick={() => handleDuplicate(d)}
+                      title="Duplicate (fork)"
+                    >
+                      <Copy className="h-3.5 w-3.5" />
                     </Button>
                     <Button
                       variant="ghost"
