@@ -130,6 +130,10 @@ export function RecentDiagramsDialog() {
                   key={d.id}
                   className="flex items-start gap-3 p-3 hover:bg-accent/40 transition group"
                 >
+                  {/* Thumbnail preview */}
+                  <div className="w-20 h-12 rounded border border-border bg-muted/20 overflow-hidden shrink-0 flex items-center justify-center">
+                    <DiagramThumbnail slug={d.slug} />
+                  </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-0.5">
                       <span className="text-sm font-medium truncate">
@@ -185,5 +189,48 @@ export function RecentDiagramsDialog() {
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// Thumbnail component: fetches the saved SVG and renders it scaled down
+function DiagramThumbnail({ slug }: { slug: string }) {
+  const [svg, setSvg] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/diagrams/${slug}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return;
+        if (data.diagram?.svgCache) {
+          setSvg(data.diagram.svgCache);
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [slug]);
+
+  if (loading) {
+    return <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />;
+  }
+  if (!svg) {
+    return <FileBox className="h-3 w-3 text-muted-foreground opacity-50" />;
+  }
+  return (
+    <div
+      className="w-full h-full flex items-center justify-center overflow-hidden"
+      dangerouslySetInnerHTML={{
+        __html: svg.replace(
+          /<svg /,
+          '<svg preserveAspectRatio="xMidYMid meet" style="max-width:100%;max-height:100%;" ',
+        ),
+      }}
+    />
   );
 }

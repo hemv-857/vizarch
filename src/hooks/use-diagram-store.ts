@@ -116,6 +116,7 @@ interface DiagramState {
 
   // Node editing (with history)
   updateNode: (id: string, patch: Partial<ArchNode>) => void;
+  updateNodePosition: (id: string, x: number, y: number) => void;
   deleteNode: (id: string) => void;
   duplicateNode: (id: string) => void;
   setNodeColor: (id: string, color: string | null) => void;
@@ -459,6 +460,18 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
     const { svg, width, height } = renderWithView(next, get().style, get());
     set({ graph: next, svg, svgWidth: width, svgHeight: height, meta: computeMeta(next, get().meta ?? undefined) });
     get().pushHistory();
+    scheduleSave(get());
+  },
+
+  // Lightweight position update without history (for drag) — no pushHistory on each move
+  // History is pushed once on drag end via a separate call
+  updateNodePosition: (id, x, y) => {
+    const graph = get().graph;
+    if (!graph) return;
+    const nodes = graph.nodes.map((n) => (n.id === id ? { ...n, x, y } : n));
+    const next = { ...graph, nodes };
+    const { svg, width, height } = renderWithView(next, get().style, get());
+    set({ graph: next, svg, svgWidth: width, svgHeight: height, meta: computeMeta(next, get().meta ?? undefined) });
     scheduleSave(get());
   },
 

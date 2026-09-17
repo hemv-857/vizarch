@@ -15,10 +15,13 @@ import {
   AlertCircle,
   PanelRightClose,
   PanelRightOpen,
+  LayoutGrid,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MiniMap } from "@/components/vizarch/mini-map";
 import { NodeSearchBar } from "@/components/vizarch/node-search-bar";
+import { CollaboratorCursors } from "@/components/vizarch/collaborator-cursors";
+import { useCollaboration } from "@/hooks/use-collaboration";
 
 export function DiagramCanvas() {
   const svg = useDiagramStore((s) => s.svg);
@@ -37,11 +40,17 @@ export function DiagramCanvas() {
   const selectedNodeId = useDiagramStore((s) => s.selectedNodeId);
   const hoveredNodeId = useDiagramStore((s) => s.hoveredNodeId);
 
+  // Collaboration: broadcast cursor position to other users
+  const { broadcastCursor } = useCollaboration();
+
   const wrapRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0, panX: 0, panY: 0 });
   const [autoFit, setAutoFit] = useState(true);
   const [wrapSize, setWrapSizeLocal] = useState({ w: 0, h: 0 });
+  // Node drag state (for repositioning nodes by dragging)
+  const [nodeDragId, setNodeDragId] = useState<string | null>(null);
+  const [nodeDragStart, setNodeDragStart] = useState({ x: 0, y: 0, nodeX: 0, nodeY: 0 });
 
   // Observe wrap size so auto-fit runs after layout settles.
   useEffect(() => {
@@ -87,23 +96,62 @@ export function DiagramCanvas() {
   );
 
   const onMouseDown = (e: React.MouseEvent) => {
+    // Check if clicking on a node → start node drag
+    const target = e.target as Element;
+    const nodeG = target.closest("g.node") as SVGGraphicsElement | null;
+    if (nodeG) {
+      const id = nodeG.getAttribute("data-id");
+      const graph = useDiagramStore.getState().graph;
+      const node = graph?.nodes.find((n) => n.id === id);
+      if (id && node) {
+        setNodeDragId(id);
+        setNodeDragStart({ x: e.clientX, y: e.clientY, nodeX: node.x, nodeY: node.y });
+        setAutoFit(false);
+        e.stopPropagation();
+        return;
+      }
+    }
     setDragging(true);
     setAutoFit(false);
     setDragStart({ x: e.clientX, y: e.clientY, panX, panY });
   };
 
+  const lastCursorBroadcastRef = useRef(0);
   const onMouseMove = (e: React.MouseEvent) => {
-    if (!dragging) return;
-    const dx = e.clientX - dragStart.x;
-    const dy = e.clientY - dragStart.y;
-    setPan(dragStart.panX + dx, dragStart.panY + dy);
+    if (nodeDragId) {
+      // Dragging a node: update its position
+      const dx = (e.clientX - nodeDragStart.x) / zoom;
+      const dy = (e.clientY - nodeDragStart.y) / zoom;
+      useDiagramStore.getState().updateNodePosition(nodeDragId, nodeDragStart.nodeX + dx, nodeDragStart.nodeY + dy);
+    } else if (dragging) {
+      const dx = e.clientX - dragStart.x;
+      const dy = e.clientY - dragStart.y;
+      setPan(dragStart.panX + dx, dragStart.panY + dy);
+    }
+    // Broadcast cursor position (throttled to ~30fps)
+    const now = Date.now();
+    if (now - lastCursorBroadcastRef.current > 33) {
+      lastCursorBroadcastRef.current = now;
+      const wrap = wrapRef.current;
+      if (wrap) {
+        const rect = wrap.getBoundingClientRect();
+        broadcastCursor(e.clientX - rect.left, e.clientY - rect.top);
+      }
+    }
   };
 
   useEffect(() => {
-    const onUp = () => setDragging(false);
+    const onUp = () => {
+      if (dragging) setDragging(false);
+      if (nodeDragId) {
+        // Push history once on drag end (so undo reverts the whole drag, not each pixel)
+        useDiagramStore.getState().pushHistory();
+        setNodeDragId(null);
+      }
+    };
     window.addEventListener("mouseup", onUp);
     return () => window.removeEventListener("mouseup", onUp);
-  }, []);
+  }, [dragging, nodeDragId]);
 
   // Click on SVG nodes / edges via event delegation
   const onSvgClick = (e: React.MouseEvent) => {
@@ -191,6 +239,20 @@ export function DiagramCanvas() {
         <div className="px-1.5 text-[11px] text-muted-foreground tabular-nums border-l border-border ml-0.5">
           {Math.round(zoom * 100)}%
         </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 w-7 p-0 border-l border-border ml-0.5"
+          onClick={() => {
+            useDiagramStore.getState().pushHistory();
+            useDiagramStore.getState().rerender();
+            resetView();
+            setAutoFit(true);
+          }}
+          title="Auto-layout (re-run layout engine)"
+        >
+          <LayoutGrid className="h-3.5 w-3.5" />
+        </Button>
         <Button
           variant="ghost"
           size="sm"
@@ -287,15 +349,21 @@ export function DiagramCanvas() {
             }}
           >
             <div
-              onMouseDown={(e) => e.stopPropagation()}
+              onMouseDown={onMouseDown}
               onClick={onSvgClick}
-              onMouseMove={onSvgMouseMove}
+              onMouseMove={(e) => {
+                onSvgMouseMove(e);
+                onMouseMove(e);
+              }}
               className="rounded-lg shadow-md"
               style={{ background: "transparent" }}
               dangerouslySetInnerHTML={{ __html: svg }}
             />
           </div>
         )}
+
+        {/* Collaborator cursors overlay */}
+        <CollaboratorCursors wrapRef={wrapRef} />
       </div>
 
       {/* Hovered node badge */}
