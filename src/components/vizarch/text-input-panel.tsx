@@ -301,11 +301,13 @@ export function TextInputPanel() {
                 key={t.id}
                 variant={store.templateId === t.id ? "default" : "outline"}
                 size="sm"
-                className="h-7 text-xs"
+                className="h-7 text-xs gap-1.5"
                 onClick={() => handleTemplate(t.id)}
                 disabled={status === "loading"}
+                title={t.description}
               >
                 {t.name}
+                <span className="text-[9px] opacity-60 tabular-nums">{t.nodes.length}</span>
               </Button>
             ))}
             {description && (

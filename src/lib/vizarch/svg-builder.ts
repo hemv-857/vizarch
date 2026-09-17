@@ -132,8 +132,11 @@ export function buildSvg(
     if (showEdgeLabels && e.label) {
       const midX = (x1 + x2) / 2;
       const midY = (y1 + y2) / 2;
+      // Wider label rect for longer text, with slight padding
+      const labelW = Math.max(60, e.label.length * 6.5 + 16);
+      const labelH = 18;
       edgeLabels.push(
-        `<g pointer-events="none"><rect x="${midX - 30}" y="${midY - 9}" width="60" height="18" rx="9" fill="${bg}" stroke="${color}" stroke-width="1" stroke-opacity="0.4" /><text x="${midX}" y="${midY + 4}" font-family="ui-sans-serif, system-ui, sans-serif" font-size="10" fill="${color}" text-anchor="middle" font-weight="500">${escapeXml(e.label)}</text></g>`,
+        `<g pointer-events="none"><rect x="${midX - labelW / 2}" y="${midY - labelH / 2}" width="${labelW}" height="${labelH}" rx="${labelH / 2}" fill="${bg}" stroke="${color}" stroke-width="1" stroke-opacity="0.5" /><text x="${midX}" y="${midY + 4}" font-family="ui-sans-serif, system-ui, sans-serif" font-size="11" fill="${color}" text-anchor="middle" font-weight="600">${escapeXml(e.label)}</text></g>`,
       );
     }
   }

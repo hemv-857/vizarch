@@ -20,7 +20,8 @@ export function MiniMap() {
   const zoom = useDiagramStore((s) => s.zoom);
   const panX = useDiagramStore((s) => s.panX);
   const panY = useDiagramStore((s) => s.panY);
-  const setZoom = useDiagramStore((s) => s.setZoom);
+  const wrapW = useDiagramStore((s) => s.wrapW);
+  const wrapH = useDiagramStore((s) => s.wrapH);
   const setPan = useDiagramStore((s) => s.setPan);
 
   // Render a simplified mini SVG (no edge labels, no node labels — just shapes)
@@ -64,18 +65,13 @@ export function MiniMap() {
   }, [svgWidth, svgHeight]);
 
   // Compute the viewport rectangle (what portion of the full SVG is currently visible)
-  // The canvas wrap dimensions are needed — we approximate using the mini-map's own aspect
+  // Uses REAL wrap dimensions from the store (set by canvas ResizeObserver)
   const viewportRect = useMemo(() => {
-    if (!miniScale || !svgWidth || !svgHeight) return null;
+    if (!miniScale || !svgWidth || !svgHeight || !wrapW || !wrapH) return null;
     // The visible area in SVG coordinates is: (wrapW / zoom) x (wrapH / zoom)
-    // We don't know wrapW/H here, so estimate using a typical 800x400 canvas
-    const estimatedWrapW = 800;
-    const estimatedWrapH = 400;
-    const visibleW = estimatedWrapW / zoom;
-    const visibleH = estimatedWrapH / zoom;
-    // The SVG is centered, then translated by panX/panY (in screen px), then scaled by zoom
-    // Center of SVG in screen coords = (wrapCenter + panX, wrapCenter + panY)
-    // In SVG coords, the top-left of visible area = (svgCenter - visibleW/2 - panX/zoom, ...)
+    const visibleW = wrapW / zoom;
+    const visibleH = wrapH / zoom;
+    // The SVG is centered in the wrap, then translated by panX/panY (in screen px), then scaled by zoom
     const svgCenterX = svgWidth / 2;
     const svgCenterY = svgHeight / 2;
     const viewX = svgCenterX - visibleW / 2 - panX / zoom;
@@ -86,10 +82,10 @@ export function MiniMap() {
       w: visibleW * miniScale,
       h: visibleH * miniScale,
     };
-  }, [miniScale, svgWidth, svgHeight, zoom, panX, panY]);
+  }, [miniScale, svgWidth, svgHeight, zoom, panX, panY, wrapW, wrapH]);
 
   function handleClick(e: React.MouseEvent<HTMLDivElement>) {
-    if (!miniScale || !svgWidth || !svgHeight) return;
+    if (!miniScale || !svgWidth || !svgHeight || !wrapW || !wrapH) return;
     const rect = e.currentTarget.getBoundingClientRect();
     // The mini-map content is centered in the div
     const renderedW = svgWidth * miniScale;
@@ -102,12 +98,8 @@ export function MiniMap() {
     const svgX = clickX / miniScale;
     const svgY = clickY / miniScale;
     // We want this point to be the center of the visible area
-    // svgX = svgCenter - visibleW/2 - panX/zoom
-    // => panX = (svgCenter - visibleW/2 - svgX) * zoom
-    const estimatedWrapW = 800;
-    const estimatedWrapH = 400;
-    const visibleW = estimatedWrapW / zoom;
-    const visibleH = estimatedWrapH / zoom;
+    const visibleW = wrapW / zoom;
+    const visibleH = wrapH / zoom;
     const newPanX = (svgWidth / 2 - visibleW / 2 - svgX) * zoom;
     const newPanY = (svgHeight / 2 - visibleH / 2 - svgY) * zoom;
     setPan(newPanX, newPanY);

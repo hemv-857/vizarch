@@ -28,10 +28,12 @@ const GROUPS: ShortcutGroup[] = [
     items: [
       { keys: ["+"], desc: "Zoom in" },
       { keys: ["−"], desc: "Zoom out" },
-      { keys: ["0"], desc: "Reset view (auto-fit)" },
+      { keys: ["F"], desc: "Fit to screen (auto-zoom)" },
+      { keys: ["0"], desc: "Reset view (zoom 100%)" },
       { keys: ["Drag"], desc: "Pan canvas" },
       { keys: ["Wheel"], desc: "Zoom (Ctrl/⌘+wheel for finer)" },
-      { keys: ["Esc"], desc: "Deselect node / edge" },
+      { keys: ["Esc"], desc: "Deselect / cancel connect mode" },
+      { keys: ["⌘/Ctrl", "F"], desc: "Search nodes (browser-style)" },
     ],
   },
   {

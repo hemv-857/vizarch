@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { Share2, GitFork } from "lucide-react";
 import { useDiagramStore } from "@/hooks/use-diagram-store";
 import { buildSvg } from "@/lib/vizarch/svg-builder";
 import { layoutGraph } from "@/lib/vizarch/layout-engine";
@@ -20,6 +21,7 @@ import { ShortcutsHelpDialog } from "@/components/vizarch/shortcuts-help-dialog"
 import { RecentDiagramsDialog } from "@/components/vizarch/recent-diagrams-dialog";
 import { DiagramStatsPanel } from "@/components/vizarch/diagram-stats-panel";
 import { MetaStats } from "@/components/vizarch/meta-stats";
+import { Button } from "@/components/ui/button";
 import { Toaster } from "sonner";
 
 const DEFAULT_DESCRIPTION =
@@ -30,6 +32,8 @@ export default function Home() {
   const didInit = useRef(false);
   const selectedEdgeId = useDiagramStore((s) => s.selectedEdgeId);
   const selectedNodeId = useDiagramStore((s) => s.selectedNodeId);
+  const viewingShared = useDiagramStore((s) => s.viewingShared);
+  const forkShared = useDiagramStore((s) => s.forkShared);
 
   // On first mount: load from localStorage OR kick off initial generation.
   useEffect(() => {
@@ -74,6 +78,24 @@ export default function Home() {
         <section aria-label="Architecture description input" className="w-full shrink-0">
           <TextInputPanel />
         </section>
+
+        {/* Fork banner: shown when viewing a shared diagram */}
+        {viewingShared && (
+          <div className="shrink-0 rounded-lg border border-teal-400/50 bg-teal-50 dark:bg-teal-950/30 px-3 py-2 flex items-center gap-2 text-xs">
+            <Share2 className="h-3.5 w-3.5 text-teal-600 shrink-0" />
+            <span className="text-teal-700 dark:text-teal-300 flex-1">
+              You're viewing a shared diagram. Edits won't change the original.
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-6 text-[10px] border-teal-400 text-teal-700 dark:text-teal-300 hover:bg-teal-50 dark:hover:bg-teal-950/50"
+              onClick={forkShared}
+            >
+              <GitFork className="h-2.5 w-2.5 mr-1" />Fork & edit
+            </Button>
+          </div>
+        )}
 
         {/* Middle: meta stats + toolbar */}
         {store.meta && (
@@ -139,6 +161,8 @@ async function initApp(store: ReturnType<typeof useDiagramStore>) {
         store.setStyle(style);
         store.setDescription(diagram.description ?? "");
         store.setShare(shareSlug, window.location.href);
+        store.setViewingShared(true);
+        if (diagram.title) store.setDiagramTitle(diagram.title);
         store.rerender();
         return;
       }

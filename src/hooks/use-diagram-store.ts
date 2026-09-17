@@ -62,6 +62,9 @@ interface DiagramState {
   zoom: number;
   panX: number;
   panY: number;
+  // Real canvas wrap dimensions (for accurate mini-map viewport)
+  wrapW: number;
+  wrapH: number;
   showCustomization: boolean;
   showExport: boolean;
   showServicesCatalog: boolean;
@@ -75,6 +78,7 @@ interface DiagramState {
   // Share
   shareUrl: string | null;
   shareSlug: string | null;
+  viewingShared: boolean;   // true when loaded via ?share= slug
 
   // History (undo/redo)
   history: HistoryEntry[];
@@ -93,6 +97,7 @@ interface DiagramState {
   setConnectMode: (fromId: string | null) => void;
   setZoom: (z: number) => void;
   setPan: (x: number, y: number) => void;
+  setWrapSize: (w: number, h: number) => void;
   resetView: () => void;
   fitToScreen: () => void;
   toggleCustomization: () => void;
@@ -129,6 +134,8 @@ interface DiagramState {
 
   // Share
   setShare: (slug: string | null, url: string | null) => void;
+  setViewingShared: (v: boolean) => void;
+  forkShared: () => void;   // fork: clear share slug so edits become a new diagram
 
   // localStorage persistence
   loadFromStorage: () => void;
@@ -256,6 +263,8 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   zoom: 1,
   panX: 0,
   panY: 0,
+  wrapW: 0,
+  wrapH: 0,
   showCustomization: true,
   showExport: false,
   showServicesCatalog: false,
@@ -265,6 +274,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   error: null,
   shareUrl: null,
   shareSlug: null,
+  viewingShared: false,
   history: [],
   historyIdx: -1,
 
@@ -341,6 +351,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   },
   setZoom: (z) => set({ zoom: Math.max(0.1, Math.min(5, z)) }),
   setPan: (x, y) => set({ panX: x, panY: y }),
+  setWrapSize: (w, h) => set({ wrapW: w, wrapH: h }),
   resetView: () => set({ zoom: 1, panX: 0, panY: 0 }),
   fitToScreen: () => set({ zoom: 1, panX: 0, panY: 0 }), // canvas component handles actual fit via ResizeObserver autoFit
   toggleCustomization: () => set({ showCustomization: !get().showCustomization }),
@@ -585,6 +596,21 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   },
 
   setShare: (slug, url) => set({ shareSlug: slug, shareUrl: url }),
+  setViewingShared: (v) => set({ viewingShared: v }),
+  forkShared: () => {
+    // Clear the share slug so this is now a new diagram (user can save a new share link)
+    set({
+      shareSlug: null,
+      shareUrl: null,
+      viewingShared: false,
+    });
+    // Clear URL param without full reload
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("share");
+      window.history.replaceState({}, "", url.toString());
+    }
+  },
 
   loadFromStorage: () => {
     const persisted = loadPersisted();

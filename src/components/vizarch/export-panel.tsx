@@ -17,6 +17,7 @@ import {
   QrCode,
   Copy,
   Loader2,
+  Terminal,
 } from "lucide-react";
 import {
   exportJson,
@@ -35,6 +36,9 @@ const FORMATS = [
   { id: "json", name: "JSON", icon: FileJson, hint: "Programmatic use", mime: "application/json" },
   { id: "md", name: "Markdown", icon: FileText, hint: "GitHub README", mime: "text/markdown" },
 ] as const;
+
+const DEFAULT_DESCRIPTION =
+  "React frontend on Vercel, Node.js API on Lambda, PostgreSQL on RDS, Redis cache, S3 storage, CloudFront CDN, SNS notifications, Datadog monitoring";
 
 export function ExportPanel() {
   const graph = useDiagramStore((s) => s.graph);
@@ -211,11 +215,47 @@ export function ExportPanel() {
           )}
         </div>
 
-        <div className="rounded-md border border-border bg-muted/30 p-2 text-[10px] text-muted-foreground">
-          <div className="font-medium text-foreground mb-0.5">Embed code</div>
-          <code className="block text-[10px] font-mono break-all leading-relaxed">
+        {/* Developer tools: Copy as cURL + Embed code */}
+        <div className="rounded-md border border-border bg-muted/30 p-2 space-y-1.5">
+          <div className="flex items-center justify-between">
+            <span className="font-medium text-foreground text-[10px]">Embed code</span>
+            <button
+              className="text-[9px] text-teal-600 hover:underline"
+              onClick={() => {
+                const embed = `<iframe src="${shareUrl ?? "https://vizarch.app/?share=..."}" width="800" height="500" frameborder="0"></iframe>`;
+                navigator.clipboard.writeText(embed);
+                toast.success("Embed code copied");
+              }}
+            >
+              Copy
+            </button>
+          </div>
+          <code className="block text-[9px] font-mono break-all leading-relaxed text-muted-foreground">
             {`<iframe src="${shareUrl ?? "https://vizarch.app/?share=..."}" width="800" height="500" frameborder="0"></iframe>`}
           </code>
+        </div>
+
+        {/* Copy as cURL (for developers) */}
+        <div className="rounded-md border border-border bg-muted/30 p-2 space-y-1.5">
+          <div className="flex items-center justify-between">
+            <span className="font-medium text-foreground text-[10px] flex items-center gap-1">
+              <Terminal className="h-2.5 w-2.5" />cURL command
+            </span>
+            <button
+              className="text-[9px] text-teal-600 hover:underline"
+              onClick={() => {
+                const desc = useDiagramStore.getState().description || DEFAULT_DESCRIPTION;
+                const curl = `curl -X POST ${window.location.origin}/api/v1/generate \\
+  -H "Content-Type: application/json" \\
+  -d '{"description": ${JSON.stringify(desc)}, "style": {"layout": "horizontal", "theme": "light"}}'`;
+                navigator.clipboard.writeText(curl);
+                toast.success("cURL command copied");
+              }}
+            >
+              Copy
+            </button>
+          </div>
+          <pre className="block text-[9px] font-mono break-all leading-relaxed text-muted-foreground whitespace-pre-wrap">{`curl -X POST ${typeof window !== "undefined" ? window.location.origin : "https://vizarch.app"}/api/v1/generate -H "Content-Type: application/json" -d '{"description": "...", "style": {"layout":"horizontal"}}'`}</pre>
         </div>
       </CardContent>
     </Card>

@@ -3,6 +3,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { generateDiagram, type GenerateRequest } from "@/lib/vizarch/diagram-service";
+import { checkRateLimit, pruneOldBuckets, QUOTAS } from "@/lib/vizarch/rate-limit";
 import { z } from "zod";
 
 export const runtime = "nodejs";
@@ -27,6 +28,30 @@ const BodySchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
+  // Rate limit check (free tier: 50 req/day by default)
+  pruneOldBuckets();
+  const rateLimit = checkRateLimit(req, "generate", "free");
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      {
+        error: "Rate limit exceeded",
+        message: `Free tier limit (${rateLimit.limit} requests/day) reached. Resets at ${new Date(rateLimit.resetAt).toISOString()}.`,
+        tier: rateLimit.tier,
+        limit: rateLimit.limit,
+        resetAt: rateLimit.resetAt,
+      },
+      {
+        status: 429,
+        headers: {
+          "X-RateLimit-Limit": String(rateLimit.limit),
+          "X-RateLimit-Remaining": "0",
+          "X-RateLimit-Reset": String(rateLimit.resetAt),
+          "Retry-After": String(Math.ceil((rateLimit.resetAt - Date.now()) / 1000)),
+        },
+      },
+    );
+  }
+
   let body: unknown;
   try {
     body = await req.json();
@@ -48,14 +73,23 @@ export async function POST(req: NextRequest) {
   }
   try {
     const result = await generateDiagram(parsed.data as GenerateRequest);
-    return NextResponse.json({
-      ok: true,
-      svg: result.svg,
-      width: result.width,
-      height: result.height,
-      graph: result.graph,
-      meta: result.meta,
-    });
+    return NextResponse.json(
+      {
+        ok: true,
+        svg: result.svg,
+        width: result.width,
+        height: result.height,
+        graph: result.graph,
+        meta: result.meta,
+      },
+      {
+        headers: {
+          "X-RateLimit-Limit": String(rateLimit.limit),
+          "X-RateLimit-Remaining": String(rateLimit.remaining),
+          "X-RateLimit-Reset": String(rateLimit.resetAt),
+        },
+      },
+    );
   } catch (err) {
     return NextResponse.json(
       { error: "Generation failed", message: (err as Error).message },
@@ -74,9 +108,6 @@ export async function GET() {
       templates: "GET /api/v1/templates",
       export: "POST /api/v1/export",
     },
-    limits: {
-      free: "10 requests/day, 100/month",
-      pro: "1,000 requests/month, 100/day",
-    },
+    limits: QUOTAS,
   });
 }

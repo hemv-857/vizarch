@@ -516,3 +516,117 @@ Task: Fix LLM parser "X on Y" merging bug, add mini-map, search, stats panel, de
 5. **Pre-warm cache** — on server startup, pre-generate common template diagrams so first request is instant
 6. **Performance: SVG memoization** — for 100+ node diagrams, memoize the SVG string by graph hash instead of re-rendering on every state change
 7. **Version history** — track diagram revisions with diff visualization
+
+---
+Task ID: 6
+Agent: main (cron webDevReview)
+Task: Fix mini-map viewport accuracy, add rate limiting, fork shared diagrams, cURL export, template badges
+
+## Current Project Status Assessment
+- vizarch is production-ready from Task 5 (mini-map, search, stats, debounce, 12-node parsing)
+- ESLint: 0 errors, 0 warnings
+- All API routes returning 200
+- VLM rating: 9/10
+- Known issues from Task 5 worklog:
+  1. Mini-map viewport rectangle uses estimated 800×400 wrap (top priority)
+  2. No rate limiting on /api/v1/generate
+  3. No "fork" option when viewing shared diagrams
+  4. Edge labels small (10px)
+  5. No keyboard shortcut for Fit
+  6. Template buttons don't show node counts
+
+## Completed Modifications
+
+### Bug Fixes
+1. **Fixed mini-map viewport accuracy** (`use-diagram-store.ts` + `diagram-canvas.tsx` + `mini-map.tsx`)
+   - Added `wrapW` and `wrapH` to store state
+   - Added `setWrapSize(w, h)` action
+   - Canvas ResizeObserver now calls `setWrapSize` with real dimensions alongside local state
+   - Mini-map `viewportRect` calculation uses `wrapW`/`wrapH` from store instead of hardcoded 800×400 estimates
+   - `handleClick` (click-to-navigate) also uses real wrap dimensions
+   - Verified: at zoom 0.39 (whole SVG visible), viewport rect = full mini-map (160×100). At zoom 0.67, viewport shrinks to 155×62. Accurate!
+
+2. **Improved edge labels** (`svg-builder.ts`)
+   - Font size: 10px → 11px
+   - Font weight: 500 → 600 (bolder)
+   - Label width: now dynamic based on text length (`Math.max(60, label.length * 6.5 + 16)`)
+   - Border opacity: 0.4 → 0.5
+   - Labels use pill-shaped rounded rects (`rx = labelH / 2`)
+
+### New Features
+
+1. **Rate limiting on /api/v1/generate** (`rate-limit.ts` + `generate/route.ts`)
+   - New `rate-limit.ts` module with in-memory IP+endpoint tracking
+   - 3 tiers: Free (50/day), Pro (1,000/day), Enterprise (10,000/day)
+   - Default tier: Free for anonymous users
+   - Daily reset (24h window)
+   - HTTP 429 response with `Retry-After` header when limit exceeded
+   - Rate limit headers on all generate responses: `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`
+   - `pruneOldBuckets()` cleanup on each request
+   - Verified: `curl -D -` shows `x-ratelimit-limit: 50`, `x-ratelimit-remaining: 46`, `x-ratelimit-reset: <epoch>`
+
+2. **Fork shared diagram** (`use-diagram-store.ts` + `page.tsx`)
+   - New `viewingShared` boolean in store (set true when loading via `?share=`)
+   - New `forkShared()` action: clears shareSlug, shareUrl, viewingShared, and removes `?share=` from URL via `history.replaceState`
+   - Teal info banner appears below input panel when `viewingShared` is true: "You're viewing a shared diagram. Edits won't change the original."
+   - "Fork & edit" button (with GitFork icon) in the banner
+   - Page `initApp()` sets `viewingShared(true)` and `diagramTitle` when loading a share link
+   - Verified: loading `/?share=jshi1jzh` shows banner; clicking Fork clears URL and hides banner
+
+3. **"F" keyboard shortcut for Fit** (`diagram-canvas.tsx`)
+   - Pressing "f" or "F" now triggers fit-to-screen (same as "0")
+   - Escape now also cancels connect mode (`setConnectMode(null)`)
+   - Shortcuts help dialog updated: added "F" → "Fit to screen", "⌘/Ctrl+F" → "Search nodes"
+
+4. **Template node count badges** (`text-input-panel.tsx`)
+   - Each preset button now shows the node count next to its name (e.g. "Serverless (AWS) 8")
+   - Count styled as `text-[9px] opacity-60 tabular-nums`
+   - Added `title={t.description}` tooltip on each button
+   - Verified: VLM confirmed all 10 templates show correct counts (8, 10, 8, 8, 11, 10, 8, 9, 9, 9)
+
+5. **cURL command export** (`export-panel.tsx`)
+   - New "cURL command" section in export panel (with Terminal icon)
+   - Shows the full curl command to reproduce the current diagram via API
+   - "Copy" button copies the curl command with the current description to clipboard
+   - Uses proper line continuation (`\`) for shell readability
+   - Verified: "cURL command" text visible in export panel
+
+6. **Improved embed code section** (`export-panel.tsx`)
+   - Embed code now has a "Copy" button (was display-only before)
+   - Both Embed code and cURL sections use consistent styling (border, muted bg, Copy link)
+
+### Styling Polish
+- Fork banner: teal border (50% opacity), teal-50 bg, Share2 + GitFork icons
+- Template buttons: gap-1.5 between name and count, count in muted opacity
+- Edge labels: pill-shaped, larger (11px), bolder (600 weight), wider for longer text
+- cURL section: Terminal icon, pre-formatted code block with whitespace-pre-wrap
+- Rate limit response: standard HTTP 429 with Retry-After header
+
+## Verification Results
+- ESLint: 0 errors, 0 warnings
+- Dev server: all routes 200, no runtime errors
+- Agent Browser QA confirmed:
+  - Mini-map viewport rect dynamically resizes with zoom (160×100 at 0.39, 155×62 at 0.67) ✓
+  - Rate limit headers present: `x-ratelimit-limit: 50`, `x-ratelimit-remaining: 46` ✓
+  - Fork banner appears on `?share=` URLs, Fork button clears URL and hides banner ✓
+  - Template buttons show node counts: 8, 10, 8, 8, 11, 10, 8, 9, 9, 9 ✓
+  - cURL command section visible in export panel ✓
+  - "F" shortcut works for fit-to-screen ✓
+  - Edge labels larger (11px, weight 600) ✓
+- VLM verified template counts and fork banner
+
+## Unresolved Issues / Risks
+- **Rate limiting is in-memory only**: Server restart resets all counters. For production, would need Redis or database-backed tracking.
+- **No auth/tiers yet**: All users are "free" tier. Pro/Enterprise require NextAuth.js + user accounts.
+- **Mobile layout**: Side panel still stacks below canvas on narrow screens. Touch gestures not optimized.
+- **Real-time collaboration**: WebSocket mini-service not yet implemented.
+- **Pre-warm cache**: Server startup doesn't pre-generate template diagrams.
+
+## Priority Recommendations for Next Phase
+1. **Pre-warm cache on startup** — generate all 10 templates on server boot so first request is instant
+2. **Real-time collaboration** — WebSocket via socket.io mini-service for multi-user editing
+3. **Auth + user accounts** — NextAuth.js for Pro/Enterprise tier enforcement
+4. **Mobile responsive** — collapsible side panel (toggle button in header), pinch-to-zoom
+5. **Version history** — track diagram revisions with diff visualization
+6. **Performance: SVG memoization** — memoize SVG string by graph hash for 100+ node diagrams
+7. **Visual regression tests** — golden file comparison for SVG output

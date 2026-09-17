@@ -39,17 +39,19 @@ export function DiagramCanvas() {
   const [dragging, setDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0, panX: 0, panY: 0 });
   const [autoFit, setAutoFit] = useState(true);
-  const [wrapSize, setWrapSize] = useState({ w: 0, h: 0 });
+  const [wrapSize, setWrapSizeLocal] = useState({ w: 0, h: 0 });
 
   // Observe wrap size so auto-fit runs after layout settles.
   useEffect(() => {
     const el = wrapRef.current;
     if (!el) return;
+    const storeSetWrapSize = useDiagramStore.getState().setWrapSize;
     const ro = new ResizeObserver((entries) => {
       const e = entries[0];
       const w = e.contentRect.width;
       const h = e.contentRect.height;
-      setWrapSize({ w, h });
+      setWrapSizeLocal({ w, h });
+      storeSetWrapSize(w, h);
     });
     ro.observe(el);
     return () => ro.disconnect();
@@ -140,13 +142,14 @@ export function DiagramCanvas() {
       if (e.key === "Escape") {
         setSelectedNode(null);
         useDiagramStore.getState().setSelectedEdge(null);
+        useDiagramStore.getState().setConnectMode(null);
       } else if (e.key === "+" || e.key === "=") {
         setZoom(zoom * 1.15);
         setAutoFit(false);
       } else if (e.key === "-" || e.key === "_") {
         setZoom(zoom * 0.85);
         setAutoFit(false);
-      } else if (e.key === "0") {
+      } else if (e.key === "0" || e.key === "f" || e.key === "F") {
         resetView();
         setAutoFit(true);
       } else if ((e.metaKey || e.ctrlKey) && (e.key === "d" || e.key === "D")) {
