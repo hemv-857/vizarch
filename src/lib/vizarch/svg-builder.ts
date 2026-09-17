@@ -12,6 +12,10 @@ export interface SvgRenderOptions {
   showEdgeLabels?: boolean;
   showNodeLabels?: boolean;
   iconSize?: "sm" | "md" | "lg";
+  selectedNodeId?: string | null;
+  selectedEdgeId?: string | null;
+  hoveredNodeId?: string | null;
+  connectModeFromId?: string | null;
 }
 
 const ICON_SIZES: Record<NonNullable<SvgRenderOptions["iconSize"]>, number> = {
@@ -50,6 +54,10 @@ export function buildSvg(
   const showLabels = opts.showNodeLabels ?? true;
   const showEdgeLabels = opts.showEdgeLabels ?? true;
   const iconSize = ICON_SIZES[opts.iconSize ?? "md"];
+  const selectedNodeId = opts.selectedNodeId ?? null;
+  const selectedEdgeId = opts.selectedEdgeId ?? null;
+  const hoveredNodeId = opts.hoveredNodeId ?? null;
+  const connectModeFromId = opts.connectModeFromId ?? null;
 
   const bounds = getGraphBounds(graph);
   const minX = Math.min(bounds.minX, bounds.maxX) - pad;
@@ -64,6 +72,7 @@ export function buildSvg(
   const subFg = theme === "dark" ? "#94a3b8" : "#475569";
   const cardBg = theme === "dark" ? "#0f172a" : "#ffffff";
   const cardStroke = theme === "dark" ? "#1e293b" : "#cbd5e1";
+  const selectionRing = theme === "dark" ? "#14b8a6" : "#0d9488";
 
   const nodeMap = new Map<string, ArchNode>(graph.nodes.map((n) => [n.id, n]));
 
@@ -99,17 +108,20 @@ export function buildSvg(
     const proto = (e.protocol ?? "direct").toLowerCase();
     const color =
       PROTOCOL_COLORS[proto] ?? (theme === "dark" ? "#94a3b8" : "#64748b");
+    const isSelected = e.id === selectedEdgeId;
+    const strokeW = isSelected ? 4 : 2;
     // Wrap each edge in a <g class="edge" data-id="..."> so canvas can detect clicks.
     // We render an invisible thick "hit" path on top for easier clicking.
     edgePaths.push(
-      `<g class="edge" data-id="${escapeXml(e.id)}" data-protocol="${escapeXml(proto)}" style="cursor:pointer">` +
-      `<path d="M${x1},${y1} C${c1x},${c1y} ${c2x},${c2y} ${x2},${y2}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-dasharray="${dashArray}" />` +
+      `<g class="edge${isSelected ? " selected" : ""}" data-id="${escapeXml(e.id)}" data-protocol="${escapeXml(proto)}" style="cursor:pointer">` +
+      (isSelected ? `<path d="M${x1},${y1} C${c1x},${c1y} ${c2x},${c2y} ${x2},${y2}" fill="none" stroke="${selectionRing}" stroke-width="${strokeW + 6}" stroke-linecap="round" stroke-opacity="0.25" pointer-events="none" />` : "") +
+      `<path d="M${x1},${y1} C${c1x},${c1y} ${c2x},${c2y} ${x2},${y2}" fill="none" stroke="${color}" stroke-width="${strokeW}" stroke-linecap="round" stroke-dasharray="${dashArray}" />` +
       `<path d="M${x1},${y1} C${c1x},${c1y} ${c2x},${c2y} ${x2},${y2}" fill="none" stroke="transparent" stroke-width="14" stroke-linecap="round" pointer-events="stroke" />` +
       `</g>`,
     );
     // Arrowhead
     const angle = Math.atan2(y2 - c2y, x2 - c2x);
-    const arrowSize = 8;
+    const arrowSize = isSelected ? 10 : 8;
     const ax = x2 - arrowSize * Math.cos(angle - Math.PI / 7);
     const ay = y2 - arrowSize * Math.sin(angle - Math.PI / 7);
     const bx = x2 - arrowSize * Math.cos(angle + Math.PI / 7);
@@ -130,10 +142,17 @@ export function buildSvg(
   for (const n of graph.nodes) {
     if (n.hidden) continue;
     const color = nodeColor(n, graph.style);
+    const isSelected = n.id === selectedNodeId;
+    const isHovered = n.id === hoveredNodeId && !isSelected;
+    const isConnectSource = n.id === connectModeFromId;
+    // Selection/hover/connect ring color
+    const ringColor = isConnectSource ? "#f59e0b" : selectionRing;
+    const showRing = isSelected || isHovered || isConnectSource;
     // Card background with subtle accent stripe + soft drop shadow
     nodeGroups.push(
-      `<g class="node" data-id="${escapeXml(n.id)}" data-service="${escapeXml(n.serviceId)}" transform="translate(${n.x},${n.y})" style="cursor:pointer">
-  <rect width="${NODE_W}" height="${NODE_H}" rx="12" ry="12" fill="${cardBg}" stroke="${cardStroke}" stroke-width="1.5" />
+      `<g class="node${isSelected ? " selected" : ""}${isHovered ? " hovered" : ""}${isConnectSource ? " connect-source" : ""}" data-id="${escapeXml(n.id)}" data-service="${escapeXml(n.serviceId)}" transform="translate(${n.x},${n.y})" style="cursor:pointer">` +
+      (showRing ? `<rect x="-4" y="-4" width="${NODE_W + 8}" height="${NODE_H + 8}" rx="14" ry="14" fill="none" stroke="${ringColor}" stroke-width="2" stroke-opacity="${isSelected || isConnectSource ? 0.9 : 0.5}" />` : "") +
+      `<rect width="${NODE_W}" height="${NODE_H}" rx="12" ry="12" fill="${cardBg}" stroke="${isSelected || isConnectSource ? ringColor : cardStroke}" stroke-width="${isSelected || isConnectSource ? 2 : 1.5}" />
   <rect width="6" height="${NODE_H}" rx="3" ry="3" fill="${color}" />
   <g transform="translate(${NODE_W / 2 - iconSize / 2}, 14)">
     <rect width="${iconSize}" height="${iconSize}" rx="${iconSize / 4}" fill="${color}22" />

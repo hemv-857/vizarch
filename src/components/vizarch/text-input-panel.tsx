@@ -144,7 +144,7 @@ export function TextInputPanel() {
     }
   }
 
-  // Collapsed (post-generation) view: thin bar with description + edit + regenerate
+  // Collapsed (post-generation) view: thin bar with title + description + edit + regenerate
   if (!expanded && graph && graph.nodes.length > 0) {
     return (
       <div className="rounded-xl border border-border/60 bg-card shadow-sm">
@@ -152,6 +152,16 @@ export function TextInputPanel() {
           <div className="flex h-7 w-7 items-center justify-center rounded-md bg-gradient-to-br from-teal-500/20 to-emerald-500/20 shrink-0">
             <Wand2 className="h-3.5 w-3.5 text-teal-600" />
           </div>
+          {/* Editable title */}
+          <input
+            type="text"
+            value={store.diagramTitle}
+            onChange={(e) => store.setDiagramTitle(e.target.value)}
+            placeholder="Untitled architecture"
+            className="h-7 px-2 text-sm font-medium bg-transparent border-0 outline-none focus:bg-accent rounded-md w-[180px] shrink-0 min-w-0 truncate"
+            aria-label="Diagram title"
+          />
+          <div className="h-4 w-px bg-border shrink-0" />
           <div className="flex-1 min-w-0">
             <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Architecture description</div>
             <div className="text-xs text-foreground/90 truncate font-mono">
@@ -161,7 +171,7 @@ export function TextInputPanel() {
           <Button
             variant="outline"
             size="sm"
-            className="h-7 text-xs"
+            className="h-7 text-xs shrink-0"
             onClick={() => {
               setExpanded(true);
               requestAnimationFrame(() => taRef.current?.focus());
@@ -172,7 +182,7 @@ export function TextInputPanel() {
           <Button
             onClick={handleGenerate}
             disabled={status === "loading" || !description.trim()}
-            className="h-7 gap-1.5 bg-gradient-to-br from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white"
+            className="h-7 gap-1.5 bg-gradient-to-br from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white shrink-0"
           >
             {status === "loading" ? (
               <Loader2 className="h-3 w-3 animate-spin" />
@@ -184,7 +194,7 @@ export function TextInputPanel() {
           <Button
             variant="ghost"
             size="sm"
-            className="h-7 w-7 p-0"
+            className="h-7 w-7 p-0 shrink-0"
             onClick={() => setExpanded(true)}
             title="Expand"
           >

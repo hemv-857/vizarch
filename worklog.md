@@ -278,3 +278,121 @@ Task: QA review, bug fixes, and major feature additions
 4. **Real-time collaboration** — WebSocket via socket.io mini-service (mentioned in spec as "Team collaboration (Post-Launch)")
 5. **More example diagrams** — add 4-5 more preset templates (e.g. "Data Lakehouse", "Real-time streaming", "GenAI RAG system")
 6. **Performance**: pre-warm cache on startup with common templates, batch Claude calls for multiple descriptions
+
+---
+Task ID: 4
+Agent: main (cron webDevReview)
+Task: QA review, fix stale meta stats, add selection highlight, connect mode, more templates, diagram title
+
+## Current Project Status Assessment
+- vizarch is production-ready from Task 3 (8 features added: dark mode, undo/redo, auto-save, insert from catalog, shortcuts help, edge editing, recent diagrams, improved SVG)
+- ESLint: 0 errors, 0 warnings
+- All API routes returning 200
+- VLM rating: 9/10
+- Known issues from Task 3 worklog:
+  1. Stale meta stats on client mutations (nodeCount/edgeCount not updating)
+  2. No visual highlight for selected edges
+  3. No "Add connection" UI (can edit existing edges but can't create new ones)
+
+## Completed Modifications
+
+### Bug Fixes
+1. **Fixed stale meta stats** (`use-diagram-store.ts`)
+   - Added `computeMeta()` helper that recalculates nodeCount/edgeCount from the graph
+   - All 6 mutation actions (updateNode, deleteNode, duplicateNode, addNode, updateEdge, deleteEdge) now call `computeMeta(next, get().meta)` and update `meta` in the set() call
+   - Undo/redo also refresh meta
+   - Verified: after adding a node via catalog, meta updates from "9 nodes" to "10 nodes" immediately
+   - Verified: after creating an edge via connect mode, meta updates from "8 edges" to "9 edges" immediately
+   - Verified: after undo, meta correctly reverts
+
+2. **Fixed connect mode not clearing visual ring** (`use-diagram-store.ts`)
+   - The `setSelectedNode` action's connect-mode branch was calling `set({ connectModeFromId: null })` but not `get().rerender()`, so the amber ring stayed on the source node
+   - Added `get().rerender()` after clearing connectModeFromId
+
+### New Features
+
+1. **Visual selection highlight for nodes & edges** (`svg-builder.ts`)
+   - `SvgRenderOptions` now accepts `selectedNodeId`, `selectedEdgeId`, `hoveredNodeId`, `connectModeFromId`
+   - Selected nodes get a teal ring (2px stroke, 90% opacity) + thicker card border
+   - Hovered nodes get a lighter teal ring (50% opacity)
+   - Connect-mode source node gets an amber ring (#f59e0b)
+   - Selected edges get a thicker stroke (4px vs 2px) + a wide semi-transparent teal glow behind
+   - Selected edge arrowheads are larger (10px vs 8px)
+   - `renderClient()` and new `renderWithView()` helper pass view state from store to builder
+   - All 12+ renderClient calls updated to renderWithView
+   - setSelectedNode/setSelectedEdge/setHoveredNode/setConnectMode now call `rerender()` to update highlights live
+
+2. **Connect nodes UI** (`node-detail-panel.tsx` + store)
+   - "Connect to another node" button in NodeDetailPanel (with Link2 icon)
+   - Click → enters connect mode (source node gets amber ring, canvas shows banner "Connect mode: click a target node to create an edge")
+   - Click another node → creates edge with "direct" protocol, auto-selects the new edge, exits connect mode
+   - Click same node → cancels connect mode
+   - Duplicate-edge prevention: addEdge returns null if same from→to pair already exists
+   - `addEdge(fromId, toId, protocol, label)` action in store with full history + meta refresh
+   - Connect-mode banner at top of canvas with pulsing amber dot + Cancel button
+   - NodeDetailPanel shows "Connect mode active" alert with instructions when active
+
+3. **4 new preset templates** (`templates.ts`)
+   - **Data Lakehouse**: Kinesis → Lambda → S3 → Glue → Redshift → Athena → QuickSight (8 nodes, 8 edges)
+   - **GenAI RAG System**: Chat UI → API GW → Lambda → Bedrock + SageMaker + OpenSearch + S3 + DynamoDB (9 nodes, 8 edges)
+   - **Event Streaming (Kafka)**: Producer → Kafka → 3 consumers + Elasticsearch + Postgres + Grafana + Prometheus (9 nodes, 9 edges)
+   - **ML Training Pipeline**: S3 + ECR → SageMaker training → Model registry → Endpoint + API GW + Lambda + Step Functions (9 nodes, 8 edges)
+   - Total templates: 6 → 10
+
+4. **Diagram title** (store + text-input-panel + export-panel)
+   - New `diagramTitle` state in store (default: "Untitled architecture")
+   - `setDiagramTitle()` action with persistence to localStorage
+   - Editable title input in the collapsed input bar (between the wand icon and the description)
+   - Title is included in auto-save (PersistShape updated)
+   - Export filenames now use slugified diagram title (e.g. "my-architecture.svg" instead of "vizarch-architecture.svg")
+   - Share links use the diagram title as the saved diagram's title
+   - `loadFromStorage()` restores the title
+
+5. **Fit to screen button** (`diagram-canvas.tsx`)
+   - Toolbar now has "Fit" button (with Maximize icon) instead of just icon-only reset
+   - Click → resets zoom to 1, pan to 0, enables autoFit mode
+   - Zoom percentage display has a left border separator for visual clarity
+
+6. **Improved canvas overlays** (`diagram-canvas.tsx`)
+   - Layer indicator (top-left) now reads from `meta.nodeCount`/`edgeCount` instead of raw graph length, so it stays in sync after mutations
+   - Connect-mode banner (top-center) appears when `connectModeFromId` is set — amber background, pulsing dot, Cancel button
+
+### Styling Polish
+- NodeDetailPanel: "Connect to another node" button is full-width with Link2 icon
+- Connect-mode active state shows amber alert box with instructions and Cancel button
+- Connect-mode banner in canvas uses backdrop-blur, amber border, pulsing dot
+- Title input in collapsed bar is borderless, turns to accent color on focus
+- Canvas toolbar "Fit" button has text label for discoverability
+- Selected node ring uses teal (#0d9488 light / #14b8a6 dark) for brand consistency
+- Connect source ring uses amber (#f59e0b) to distinguish from selection
+
+## Verification Results
+- ESLint: 0 errors, 0 warnings
+- Dev server: all routes 200
+- Agent Browser QA confirmed:
+  - Page loads with 9 nodes visible, title input present, Fit button present ✓
+  - Meta stats show correct counts after initial load (9 nodes, 8 edges) ✓
+  - Click node → selection ring appears (teal, verified via DOM: `g.node.selected` with `rect[stroke="#0d9488"]`) ✓
+  - Click "Connect to another node" → amber ring on source, banner visible ✓
+  - Click target node → edge created (8→9 edges), connect mode auto-cancels, meta updates ✓
+  - Undo button enables after mutation, correctly reverts (10→9 edges), meta updates ✓
+  - Diagram title input editable in collapsed bar ✓
+  - 10 templates now available (6 original + 4 new) ✓
+- VLM final rating: 9/10 ("clean, professional, highly functional")
+
+## Unresolved Issues / Risks
+- **Mini-map not implemented**: For large diagrams (20+ nodes), users can lose orientation when zoomed in. A mini-map overview in the corner would help. (Skipped this round due to complexity.)
+- **Recent diagrams "Duplicate" action**: The recent diagrams dialog has Open and Delete but no "Duplicate" (fork) action. Low priority.
+- **Empty state for canvas**: When no diagram is loaded, the canvas shows a generic "No diagram yet" message. Could be improved with an illustration or onboarding guide.
+- **Loading skeletons**: During LLM generation (2-7s), the canvas shows a spinner but no skeleton. Could add a shimmer placeholder.
+- **Mobile layout**: Side panel stacks below canvas on narrow screens. Not yet optimized for touch.
+- **Large diagram performance**: SVG re-renders on every keystroke during label editing. For 100+ node diagrams, could debounce.
+
+## Priority Recommendations for Next Phase
+1. **Mini-map overview** — small thumbnail of the full diagram in a corner, with a viewport rectangle showing the current zoom/pan position. Click to navigate.
+2. **Real-time collaboration** — WebSocket via socket.io mini-service for multi-user editing
+3. **Empty state + onboarding** — illustrated empty state with "Try a template" CTA when no diagram is loaded
+4. **Loading skeleton** — shimmer placeholder during LLM generation
+5. **Performance: debounce label edits** — when editing node labels, debounce the SVG re-render by 200ms
+6. **Mobile responsive** — collapsible side panel, touch-friendly zoom gestures
+7. **Rate limiting** — implement Free/Pro/Enterprise quotas on /api/v1/generate

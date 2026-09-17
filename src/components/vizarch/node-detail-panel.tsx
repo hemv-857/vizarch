@@ -11,6 +11,8 @@ import {
   Copy,
   Trash2,
   X,
+  Link2,
+  ArrowRight,
 } from "lucide-react";
 import { getProviderLabel, getTypeLabel, TYPE_COLORS } from "@/lib/vizarch/services";
 import { toast } from "sonner";
@@ -29,6 +31,8 @@ export function NodeDetailPanel() {
   const duplicateNode = useDiagramStore((s) => s.duplicateNode);
   const setNodeColor = useDiagramStore((s) => s.setNodeColor);
   const setSelectedNode = useDiagramStore((s) => s.setSelectedNode);
+  const setConnectMode = useDiagramStore((s) => s.setConnectMode);
+  const connectModeFromId = useDiagramStore((s) => s.connectModeFromId);
 
   if (!graph || !selectedId) return null;
   const node = graph.nodes.find((n) => n.id === selectedId);
@@ -120,18 +124,51 @@ export function NodeDetailPanel() {
           <div className="rounded-md border border-border p-2">
             <div className="font-medium text-muted-foreground">Incoming</div>
             <div className="text-base font-semibold">{incoming.length}</div>
-            <div className="text-[10px] text-muted-foreground">
+            <div className="text-[10px] text-muted-foreground truncate">
               {incoming.slice(0, 3).map((e) => graph.nodes.find((n) => n.id === e.from)?.label).join(", ") || "—"}
             </div>
           </div>
           <div className="rounded-md border border-border p-2">
             <div className="font-medium text-muted-foreground">Outgoing</div>
             <div className="text-base font-semibold">{outgoing.length}</div>
-            <div className="text-[10px] text-muted-foreground">
+            <div className="text-[10px] text-muted-foreground truncate">
               {outgoing.slice(0, 3).map((e) => graph.nodes.find((n) => n.id === e.to)?.label).join(", ") || "—"}
             </div>
           </div>
         </div>
+
+        {/* Connect to another node */}
+        {connectModeFromId === node.id ? (
+          <div className="rounded-md border border-amber-400 bg-amber-50 dark:bg-amber-950/30 p-2 text-[11px] text-amber-700 dark:text-amber-300">
+            <div className="flex items-center gap-1.5 mb-1">
+              <ArrowRight className="h-3 w-3 animate-pulse" />
+              <span className="font-medium">Connect mode active</span>
+            </div>
+            <div className="text-[10px] mb-1.5">
+              Click any other node in the canvas to create a connection from <strong>{node.label}</strong>.
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-6 w-full text-[10px]"
+              onClick={() => setConnectMode(null)}
+            >
+              Cancel
+            </Button>
+          </div>
+        ) : (
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full h-8 text-xs"
+            onClick={() => {
+              setConnectMode(node.id);
+              toast.info(`Click another node to connect from "${node.label}"`);
+            }}
+          >
+            <Link2 className="h-3.5 w-3.5 mr-1.5" />Connect to another node
+          </Button>
+        )}
 
         <div className="flex items-center gap-1.5 pt-1">
           <Button

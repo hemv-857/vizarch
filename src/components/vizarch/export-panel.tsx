@@ -39,9 +39,17 @@ const FORMATS = [
 export function ExportPanel() {
   const graph = useDiagramStore((s) => s.graph);
   const svg = useDiagramStore((s) => s.svg);
+  const diagramTitle = useDiagramStore((s) => s.diagramTitle);
   const [busy, setBusy] = useState<string | null>(null);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [shareSlug, setShareSlug] = useState<string | null>(null);
+
+  // Slugify the diagram title for filenames
+  const fileBase = (diagramTitle || "vizarch-architecture")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 50) || "vizarch-architecture";
 
   async function handleExport(format: (typeof FORMATS)[number]["id"]) {
     if (!graph) {
@@ -51,17 +59,17 @@ export function ExportPanel() {
     setBusy(format);
     try {
       if (format === "svg") {
-        downloadSvg(svg, "vizarch-architecture.svg");
+        downloadSvg(svg, `${fileBase}.svg`);
         toast.success("SVG downloaded");
       } else if (format === "json") {
-        downloadText(exportJson(graph), "vizarch-architecture.json", "application/json");
+        downloadText(exportJson(graph), `${fileBase}.json`, "application/json");
         toast.success("JSON downloaded");
       } else if (format === "md") {
-        downloadText(exportMarkdown(graph), "vizarch-architecture.md", "text/markdown");
+        downloadText(exportMarkdown(graph), `${fileBase}.md`, "text/markdown");
         toast.success("Markdown downloaded");
       } else if (format === "png") {
         const blob = await exportPngBrowser(svg, { scale: 2 });
-        triggerDownload(blob, "vizarch-architecture.png");
+        triggerDownload(blob, `${fileBase}.png`);
         toast.success("PNG downloaded (2x resolution)");
       } else if (format === "pdf") {
         // Render PNG then open in print window
@@ -94,7 +102,7 @@ export function ExportPanel() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          title: graph.nodes[0]?.label ? `${graph.nodes.length}-node architecture` : "Untitled",
+          title: diagramTitle || `${graph.nodes.length}-node architecture`,
           description: useDiagramStore.getState().description || "template",
           graphJson: JSON.stringify(graph),
           styleJson: JSON.stringify(graph.style ?? {}),

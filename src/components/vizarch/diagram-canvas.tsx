@@ -172,28 +172,44 @@ export function DiagramCanvas() {
     <div className="relative h-full min-h-[320px] rounded-xl border border-border/60 bg-card shadow-sm overflow-hidden">
       {/* Toolbar */}
       <div className="absolute top-2 right-2 z-10 flex items-center gap-1 rounded-lg border border-border bg-background/90 backdrop-blur px-1 py-1 shadow-sm">
-        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => { setZoom(zoom * 1.2); setAutoFit(false); }} title="Zoom in">
+        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => { setZoom(zoom * 1.2); setAutoFit(false); }} title="Zoom in (+)">
           <ZoomIn className="h-3.5 w-3.5" />
         </Button>
-        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => { setZoom(zoom * 0.8); setAutoFit(false); }} title="Zoom out">
+        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => { setZoom(zoom * 0.8); setAutoFit(false); }} title="Zoom out (−)">
           <ZoomOut className="h-3.5 w-3.5" />
         </Button>
-        <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => { resetView(); setAutoFit(true); }} title="Reset view">
-          <Maximize className="h-3.5 w-3.5" />
+        <Button variant="ghost" size="sm" className="h-7 px-2 text-[11px]" onClick={() => { resetView(); setAutoFit(true); }} title="Fit to screen (0)">
+          <Maximize className="h-3.5 w-3.5 mr-1" />Fit
         </Button>
-        <div className="px-1.5 text-[11px] text-muted-foreground tabular-nums">
+        <div className="px-1.5 text-[11px] text-muted-foreground tabular-nums border-l border-border ml-0.5">
           {Math.round(zoom * 100)}%
         </div>
       </div>
 
-      {/* Layer indicator */}
+      {/* Layer indicator (top-left) */}
       <div className="absolute top-2 left-2 z-10 flex items-center gap-1 rounded-lg border border-border bg-background/90 backdrop-blur px-2 py-1 shadow-sm">
         <Layers className="h-3.5 w-3.5 text-teal-600" />
         <span className="text-[11px] text-muted-foreground">
-          {useDiagramStore.getState().graph?.nodes.length ?? 0} nodes ·{" "}
-          {useDiagramStore.getState().graph?.edges.length ?? 0} edges
+          {useDiagramStore.getState().meta?.nodeCount ?? 0} nodes ·{" "}
+          {useDiagramStore.getState().meta?.edgeCount ?? 0} edges
         </span>
       </div>
+
+      {/* Connect-mode banner */}
+      {useDiagramStore.getState().connectModeFromId && (
+        <div className="absolute top-12 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 rounded-lg border border-amber-400 bg-amber-50 dark:bg-amber-950/40 backdrop-blur px-3 py-1.5 shadow-sm text-[11px] text-amber-700 dark:text-amber-300">
+          <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+          <span>
+            <strong>Connect mode:</strong> click a target node to create an edge
+          </span>
+          <button
+            className="ml-1 underline hover:no-underline text-amber-800 dark:text-amber-200"
+            onClick={() => useDiagramStore.getState().setConnectMode(null)}
+          >
+            Cancel
+          </button>
+        </div>
+      )}
 
       {error && (
         <div className="absolute inset-2 z-10 flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">

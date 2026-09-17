@@ -42,6 +42,7 @@ interface DiagramState {
   // Source input
   description: string;
   templateId: string | null;
+  diagramTitle: string;          // user-editable title (saved with share link)
 
   // Generated diagram
   graph: ArchGraph | null;
@@ -56,6 +57,8 @@ interface DiagramState {
   selectedNodeId: string | null;
   selectedEdgeId: string | null;
   hoveredNodeId: string | null;
+  // Node connection mode: when set, clicking another node creates an edge from this one
+  connectModeFromId: string | null;
   zoom: number;
   panX: number;
   panY: number;
@@ -80,15 +83,18 @@ interface DiagramState {
   // Actions
   setDescription: (d: string) => void;
   setTemplate: (id: string | null) => void;
+  setDiagramTitle: (t: string) => void;
   setStyle: (patch: Partial<ArchStyle>) => void;
   toggleDarkMode: () => void;
   setDarkMode: (v: boolean) => void;
   setSelectedNode: (id: string | null) => void;
   setSelectedEdge: (id: string | null) => void;
   setHoveredNode: (id: string | null) => void;
+  setConnectMode: (fromId: string | null) => void;
   setZoom: (z: number) => void;
-  setPan: (x: number, y) => void;
+  setPan: (x: number, y: number) => void;
   resetView: () => void;
+  fitToScreen: () => void;
   toggleCustomization: () => void;
   toggleExport: () => void;
   toggleServicesCatalog: () => void;
@@ -109,6 +115,7 @@ interface DiagramState {
   // Edge editing
   updateEdge: (id: string, patch: Partial<ArchEdge>) => void;
   deleteEdge: (id: string) => void;
+  addEdge: (fromId: string, toId: string, protocol?: string, label?: string) => string | null;
 
   // History
   pushHistory: () => void;
@@ -127,7 +134,12 @@ interface DiagramState {
   loadFromStorage: () => void;
 }
 
-function renderClient(graph: ArchGraph, style: ArchStyle) {
+function renderClient(graph: ArchGraph, style: ArchStyle, view?: {
+  selectedNodeId?: string | null;
+  selectedEdgeId?: string | null;
+  hoveredNodeId?: string | null;
+  connectModeFromId?: string | null;
+}) {
   const layoutOpts = {
     orientation:
       style.layout === "vertical" || style.layout === "hierarchical"
@@ -141,14 +153,44 @@ function renderClient(graph: ArchGraph, style: ArchStyle) {
     showEdgeLabels: style.showEdgeLabels,
     showNodeLabels: style.showLabels,
     iconSize: style.iconSize,
+    selectedNodeId: view?.selectedNodeId ?? null,
+    selectedEdgeId: view?.selectedEdgeId ?? null,
+    hoveredNodeId: view?.hoveredNodeId ?? null,
+    connectModeFromId: view?.connectModeFromId ?? null,
   });
   return { svg, width, height };
+}
+
+// Helper: compute a fresh meta object from the current graph (used after mutations)
+function computeMeta(graph: ArchGraph, base?: DiagramMeta): DiagramMeta {
+  return {
+    nodeCount: graph.nodes.filter((n) => !n.hidden).length,
+    edgeCount: graph.edges.filter((e) => !e.hidden).length,
+    parseTimeMs: base?.parseTimeMs ?? 0,
+    layoutTimeMs: base?.layoutTimeMs ?? 0,
+    exportTimeMs: base?.exportTimeMs ?? 0,
+    cacheHit: base?.cacheHit ?? false,
+    confidence: base?.confidence,
+    ambiguities: base?.ambiguities,
+    usedFallback: base?.usedFallback,
+  };
+}
+
+// Helper: render a graph with the current view state (selection, hover, connect mode)
+function renderWithView(graph: ArchGraph, style: ArchStyle, state: DiagramState) {
+  return renderClient(graph, style, {
+    selectedNodeId: state.selectedNodeId,
+    selectedEdgeId: state.selectedEdgeId,
+    hoveredNodeId: state.hoveredNodeId,
+    connectModeFromId: state.connectModeFromId,
+  });
 }
 
 const STORAGE_KEY = "vizarch:autosave:v2";
 
 interface PersistShape {
   description: string;
+  diagramTitle?: string;
   graph: ArchGraph | null;
   style: ArchStyle;
   darkMode: boolean;
@@ -170,6 +212,7 @@ function saveToStorage(state: DiagramState) {
   try {
     const payload: PersistShape = {
       description: state.description,
+      diagramTitle: state.diagramTitle,
       graph: state.graph,
       style: state.style,
       darkMode: state.darkMode,
@@ -198,6 +241,7 @@ function applyDarkModeClass(dark: boolean) {
 export const useDiagramStore = create<DiagramState>((set, get) => ({
   description: "",
   templateId: null,
+  diagramTitle: "Untitled architecture",
   graph: null,
   svg: "",
   svgWidth: 0,
@@ -208,6 +252,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   selectedNodeId: null,
   selectedEdgeId: null,
   hoveredNodeId: null,
+  connectModeFromId: null,
   zoom: 1,
   panX: 0,
   panY: 0,
@@ -231,6 +276,10 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
     set({ templateId: id, description: id ? "" : get().description });
     scheduleSave(get());
   },
+  setDiagramTitle: (t) => {
+    set({ diagramTitle: t || "Untitled architecture" });
+    scheduleSave(get());
+  },
 
   setStyle: (patch) => {
     const next = { ...get().style, ...patch };
@@ -238,7 +287,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
     const graph = get().graph;
     if (graph) {
       const g = { ...graph, style: next };
-      const { svg, width, height } = renderClient(g, next);
+      const { svg, width, height } = renderWithView(g, next, get());
       set({ graph: g, svg, svgWidth: width, svgHeight: height });
     }
     scheduleSave(get());
@@ -259,12 +308,41 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
     scheduleSave(get());
   },
 
-  setSelectedNode: (id) => set({ selectedNodeId: id, selectedEdgeId: null }),
-  setSelectedEdge: (id) => set({ selectedEdgeId: id, selectedNodeId: null }),
-  setHoveredNode: (id) => set({ hoveredNodeId: id }),
+  setSelectedNode: (id) => {
+    const state = get();
+    // If in connect mode and user clicks a different node, create an edge
+    if (state.connectModeFromId && id && state.connectModeFromId !== id) {
+      state.addEdge(state.connectModeFromId, id, "direct");
+      set({ connectModeFromId: null });
+      get().rerender();
+      return;
+    }
+    // If in connect mode and clicks the same node, cancel
+    if (state.connectModeFromId && id === state.connectModeFromId) {
+      set({ connectModeFromId: null });
+      get().rerender();
+      return;
+    }
+    set({ selectedNodeId: id, selectedEdgeId: null });
+    get().rerender();
+  },
+  setSelectedEdge: (id) => {
+    set({ selectedEdgeId: id, selectedNodeId: null });
+    get().rerender();
+  },
+  setHoveredNode: (id) => {
+    if (get().hoveredNodeId === id) return; // no-op if unchanged
+    set({ hoveredNodeId: id });
+    get().rerender();
+  },
+  setConnectMode: (fromId) => {
+    set({ connectModeFromId: fromId, selectedEdgeId: null });
+    get().rerender();
+  },
   setZoom: (z) => set({ zoom: Math.max(0.1, Math.min(5, z)) }),
   setPan: (x, y) => set({ panX: x, panY: y }),
   resetView: () => set({ zoom: 1, panX: 0, panY: 0 }),
+  fitToScreen: () => set({ zoom: 1, panX: 0, panY: 0 }), // canvas component handles actual fit via ResizeObserver autoFit
   toggleCustomization: () => set({ showCustomization: !get().showCustomization }),
   toggleExport: () => set({ showExport: !get().showExport }),
   toggleServicesCatalog: () => set({ showServicesCatalog: !get().showServicesCatalog }),
@@ -318,7 +396,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
     if (historyIdx <= 0) return;
     const target = history[historyIdx - 1];
     if (!target) return;
-    const { svg, width, height } = renderClient(target.graph, get().style);
+    const { svg, width, height } = renderWithView(target.graph, get().style, get());
     set({
       graph: target.graph,
       description: target.description,
@@ -327,6 +405,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
       svgWidth: width,
       svgHeight: height,
       historyIdx: historyIdx - 1,
+      meta: computeMeta(target.graph, get().meta ?? undefined),
     });
     scheduleSave(get());
   },
@@ -336,7 +415,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
     if (historyIdx >= history.length - 1) return;
     const target = history[historyIdx + 1];
     if (!target) return;
-    const { svg, width, height } = renderClient(target.graph, get().style);
+    const { svg, width, height } = renderWithView(target.graph, get().style, get());
     set({
       graph: target.graph,
       description: target.description,
@@ -345,6 +424,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
       svgWidth: width,
       svgHeight: height,
       historyIdx: historyIdx + 1,
+      meta: computeMeta(target.graph, get().meta ?? undefined),
     });
     scheduleSave(get());
   },
@@ -357,8 +437,8 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
     if (!graph) return;
     const nodes = graph.nodes.map((n) => (n.id === id ? { ...n, ...patch } : n));
     const next = { ...graph, nodes };
-    const { svg, width, height } = renderClient(next, get().style);
-    set({ graph: next, svg, svgWidth: width, svgHeight: height });
+    const { svg, width, height } = renderWithView(next, get().style, get());
+    set({ graph: next, svg, svgWidth: width, svgHeight: height, meta: computeMeta(next, get().meta ?? undefined) });
     get().pushHistory();
     scheduleSave(get());
   },
@@ -369,13 +449,14 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
     const nodes = graph.nodes.filter((n) => n.id !== id);
     const edges = graph.edges.filter((e) => e.from !== id && e.to !== id);
     const next = { ...graph, nodes, edges };
-    const { svg, width, height } = renderClient(next, get().style);
+    const { svg, width, height } = renderWithView(next, get().style, get());
     set({
       graph: next,
       svg,
       svgWidth: width,
       svgHeight: height,
       selectedNodeId: null,
+      meta: computeMeta(next, get().meta ?? undefined),
     });
     get().pushHistory();
     scheduleSave(get());
@@ -395,8 +476,8 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
       label: `${node.label} (copy)`,
     };
     const next = { ...graph, nodes: [...graph.nodes, newNode] };
-    const { svg, width, height } = renderClient(next, get().style);
-    set({ graph: next, svg, svgWidth: width, svgHeight: height });
+    const { svg, width, height } = renderWithView(next, get().style, get());
+    set({ graph: next, svg, svgWidth: width, svgHeight: height, meta: computeMeta(next, get().meta ?? undefined) });
     get().pushHistory();
     scheduleSave(get());
   },
@@ -424,13 +505,43 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
       y: 200,
     };
     const next = { ...graph, nodes: [...graph.nodes, newNode] };
-    const { svg, width, height } = renderClient(next, get().style);
+    const { svg, width, height } = renderWithView(next, get().style, get());
     set({
       graph: next,
       svg,
       svgWidth: width,
       svgHeight: height,
       selectedNodeId: newId,
+      meta: computeMeta(next, get().meta ?? undefined),
+    });
+    get().pushHistory();
+    scheduleSave(get());
+    return newId;
+  },
+
+  addEdge: (fromId, toId, protocol = "direct", label) => {
+    const graph = get().graph;
+    if (!graph) return null;
+    // Prevent duplicate edges between the same pair (same direction)
+    if (graph.edges.some((e) => e.from === fromId && e.to === toId)) return null;
+    const newId = `e${Date.now().toString(36)}`;
+    const newEdge: ArchEdge = {
+      id: newId,
+      from: fromId,
+      to: toId,
+      protocol,
+      label,
+      style: "solid",
+    };
+    const next = { ...graph, edges: [...graph.edges, newEdge] };
+    const { svg, width, height } = renderWithView(next, get().style, get());
+    set({
+      graph: next,
+      svg,
+      svgWidth: width,
+      svgHeight: height,
+      selectedEdgeId: newId,
+      meta: computeMeta(next, get().meta ?? undefined),
     });
     get().pushHistory();
     scheduleSave(get());
@@ -442,8 +553,8 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
     if (!graph) return;
     const edges = graph.edges.map((e) => (e.id === id ? { ...e, ...patch } : e));
     const next = { ...graph, edges };
-    const { svg, width, height } = renderClient(next, get().style);
-    set({ graph: next, svg, svgWidth: width, svgHeight: height });
+    const { svg, width, height } = renderWithView(next, get().style, get());
+    set({ graph: next, svg, svgWidth: width, svgHeight: height, meta: computeMeta(next, get().meta ?? undefined) });
     get().pushHistory();
     scheduleSave(get());
   },
@@ -453,13 +564,14 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
     if (!graph) return;
     const edges = graph.edges.filter((e) => e.id !== id);
     const next = { ...graph, edges };
-    const { svg, width, height } = renderClient(next, get().style);
+    const { svg, width, height } = renderWithView(next, get().style, get());
     set({
       graph: next,
       svg,
       svgWidth: width,
       svgHeight: height,
       selectedEdgeId: null,
+      meta: computeMeta(next, get().meta ?? undefined),
     });
     get().pushHistory();
     scheduleSave(get());
@@ -468,7 +580,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   rerender: () => {
     const graph = get().graph;
     if (!graph) return;
-    const { svg, width, height } = renderClient(graph, get().style);
+    const { svg, width, height } = renderWithView(graph, get().style, get());
     set({ svg, svgWidth: width, svgHeight: height });
   },
 
@@ -487,7 +599,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
     }
     if (persisted.graph) {
       const g = persisted.graph;
-      const { svg, width, height } = renderClient(g, get().style);
+      const { svg, width, height } = renderWithView(g, get().style, get());
       set({
         graph: g,
         svg,
@@ -511,6 +623,9 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
     }
     if (typeof persisted.description === "string") {
       set({ description: persisted.description });
+    }
+    if (typeof persisted.diagramTitle === "string") {
+      set({ diagramTitle: persisted.diagramTitle });
     }
   },
 }));
