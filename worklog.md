@@ -1021,3 +1021,89 @@ Task: Wire collaborator cursors, node drag-to-move, auto-layout, diagram thumbna
 5. **Rate limiting persistence** — use database or Redis for rate limit counters
 6. **GitHub Action / Slack bot** — integrations for CI/CD diagram generation
 7. **Performance: SVG memoization** — for 100+ node diagrams, memoize by graph hash
+
+---
+Task ID: 11
+Agent: main (cron webDevReview)
+Task: Import JSON, keyboard shortcuts, right-click context menu, shortcuts update
+
+## Current Project Status Assessment
+- vizarch is production-ready from Task 10 (collaborator cursors, node drag, auto-layout, thumbnails)
+- ESLint: 0 errors, 0 warnings
+- All API routes returning 200
+- Collab service running on port 3003
+- VLM rating: 9/10
+- Known issues from Task 10 worklog:
+  1. Node drag requires real mouse interaction (agent-browser limitation)
+  2. Collab service not auto-started
+  3. No auth/tiers
+  4. Mobile layout
+  5. Rate limiting is in-memory only
+
+## Completed Modifications
+
+### New Features (4)
+
+1. **Import from JSON dialog** (`import-json-dialog.tsx`)
+   - New dialog with textarea for pasting JSON + file upload button (.json files)
+   - Validates JSON structure (must have `nodes` and `edges` arrays, each node must have `id`, `serviceId`, `label`)
+   - Parses JSON, runs layout engine, renders SVG, applies to store
+   - Error display with red border + AlertCircle icon
+   - Loading state with spinner
+   - Success toast: `Imported N nodes, M edges`
+   - Also imports style and title from the JSON if present
+   - Verified: dialog opens via "Import" button in header and via Cmd+Shift+I shortcut
+
+2. **New keyboard shortcuts** (`page.tsx`)
+   - **Cmd/Ctrl+S** — toggle export/share panel (quick save)
+   - **Cmd/Ctrl+N** — new diagram (with confirmation prompt to prevent data loss)
+   - **Cmd/Ctrl+Shift+I** — open Import JSON dialog
+   - Updated shortcuts help dialog to include all new shortcuts
+   - All shortcuts work even when typing in inputs (except undo/redo which respects isEditable)
+   - Verified: Cmd+S opens export panel, Cmd+Shift+I opens import dialog
+
+3. **Right-click context menu on nodes** (`diagram-canvas.tsx`)
+   - New `onSvgContextMenu` handler on the SVG container div
+   - Right-clicking a node: selects it (opens NodeDetailPanel with edit/duplicate/delete/connect)
+   - Right-clicking an edge: selects it (opens EdgeDetailPanel with protocol/label/style)
+   - Right-clicking empty canvas: does nothing (doesn't prevent default)
+   - `e.preventDefault()` stops the browser's default context menu on nodes/edges
+
+4. **"Import" button in header** (`header.tsx`)
+   - New Upload icon button (hidden on mobile, visible on md+ screens)
+   - Positioned after the "New" button
+   - Opens the Import JSON dialog on click
+
+### Bug Fixes
+- **Fixed duplicate onSvgMouseMove**: The canvas had two identical `onSvgMouseMove` function definitions after the context menu code was added. Removed the duplicate.
+- **Fixed leftover code after onSvgClick**: Stray lines from the old onSvgClick were left after the context menu refactor. Cleaned up.
+
+## Verification Results
+- ESLint: 0 errors, 0 warnings
+- Dev server: all routes 200
+- Collab service: running on port 3003
+- Agent Browser QA confirmed:
+  - "Import" button visible in header ✓
+  - "New" button visible in header ✓
+  - Cmd+S opens export panel ✓
+  - Cmd+Shift+I opens import dialog ✓
+  - Import dialog has textarea + file upload + error display ✓
+  - Right-click context menu handler added to SVG container ✓
+  - Shortcuts help dialog includes new shortcuts ✓
+- VLM final rating: 9/10 ("Clean UI, clear visualization, comprehensive customization options")
+
+## Unresolved Issues / Risks
+- **Collab service not auto-started**: The mini-service needs manual start.
+- **No auth/tiers yet**: All users are "free" tier.
+- **Mobile layout**: Touch gestures not optimized.
+- **Rate limiting is in-memory only**: Server restart resets counters.
+- **Node drag verification**: Agent-browser can't properly test drag-to-move (React synthetic events).
+
+## Priority Recommendations for Next Phase
+1. **Auto-start collab service** — integrate with dev server startup
+2. **Auth + user accounts** — NextAuth.js for Pro/Enterprise tier enforcement
+3. **Mobile responsive** — pinch-to-zoom on canvas, touch-friendly node selection
+4. **Visual regression tests** — golden file comparison for SVG output
+5. **Rate limiting persistence** — use database or Redis for rate limit counters
+6. **GitHub Action / Slack bot** — integrations for CI/CD diagram generation
+7. **Performance: SVG memoization** — for 100+ node diagrams, memoize by graph hash

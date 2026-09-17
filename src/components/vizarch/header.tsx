@@ -12,6 +12,7 @@ import {
   GitBranch,
   PanelRightOpen,
   FilePlus,
+  Upload,
 } from "lucide-react";
 import { useDiagramStore } from "@/hooks/use-diagram-store";
 import { Button } from "@/components/ui/button";
@@ -30,6 +31,7 @@ export function VizarchHeader() {
   const toggleShortcuts = useDiagramStore((s) => s.toggleShortcutsHelp);
   const toggleRecent = useDiagramStore((s) => s.toggleRecentPanel);
   const toggleVersionHistory = useDiagramStore((s) => s.toggleVersionHistory);
+  const toggleImportJson = useDiagramStore((s) => s.toggleImportJson);
   const shareSlug = useDiagramStore((s) => s.shareSlug);
   const [urlHasShare, setUrlHasShare] = useState(false);
   const darkMode = useDiagramStore((s) => s.darkMode);
@@ -71,6 +73,16 @@ export function VizarchHeader() {
           >
             <FilePlus className="h-4 w-4" />
             <span className="ml-1.5 text-xs">New</span>
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 px-2 hidden md:flex"
+            onClick={toggleImportJson}
+            title="Import from JSON"
+          >
+            <Upload className="h-4 w-4" />
+            <span className="ml-1.5 text-xs">Import</span>
           </Button>
           <div className="flex flex-col min-w-0">
             <div className="flex items-center gap-2">

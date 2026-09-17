@@ -20,6 +20,9 @@ const GROUPS: ShortcutGroup[] = [
     title: "Generation",
     items: [
       { keys: ["⌘/Ctrl", "Enter"], desc: "Generate diagram from description" },
+      { keys: ["⌘/Ctrl", "S"], desc: "Toggle export/share panel" },
+      { keys: ["⌘/Ctrl", "N"], desc: "New diagram (confirm first)" },
+      { keys: ["⌘/Ctrl", "Shift+I"], desc: "Import diagram from JSON" },
       { keys: ["?", "Shift+/",], desc: "Open this shortcuts dialog" },
     ],
   },

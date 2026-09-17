@@ -177,6 +177,29 @@ export function DiagramCanvas() {
     useDiagramStore.getState().setSelectedEdge(null);
   };
 
+  // Right-click context menu on nodes
+  const onSvgContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const target = e.target as Element;
+    const nodeG = target.closest("g.node") as SVGGraphicsElement | null;
+    if (nodeG) {
+      const id = nodeG.getAttribute("data-id");
+      if (id) {
+        setSelectedNode(id);
+        // The node detail panel will show with edit/duplicate/delete/connect buttons
+        return;
+      }
+    }
+    const edgeG = target.closest("g.edge") as SVGGraphicsElement | null;
+    if (edgeG) {
+      const id = edgeG.getAttribute("data-id");
+      if (id) {
+        useDiagramStore.getState().setSelectedEdge(id);
+        return;
+      }
+    }
+  };
+
   const onSvgMouseMove = (e: React.MouseEvent) => {
     const target = e.target as Element;
     const g = target.closest("g.node") as SVGGraphicsElement | null;
@@ -351,6 +374,7 @@ export function DiagramCanvas() {
             <div
               onMouseDown={onMouseDown}
               onClick={onSvgClick}
+              onContextMenu={onSvgContextMenu}
               onMouseMove={(e) => {
                 onSvgMouseMove(e);
                 onMouseMove(e);

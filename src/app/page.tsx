@@ -20,6 +20,7 @@ import { ServicesCatalogDialog } from "@/components/vizarch/services-catalog-dia
 import { ShortcutsHelpDialog } from "@/components/vizarch/shortcuts-help-dialog";
 import { RecentDiagramsDialog } from "@/components/vizarch/recent-diagrams-dialog";
 import { VersionHistoryDialog } from "@/components/vizarch/version-history-dialog";
+import { ImportJsonDialog } from "@/components/vizarch/import-json-dialog";
 import { DiagramStatsPanel } from "@/components/vizarch/diagram-stats-panel";
 import { MetaStats } from "@/components/vizarch/meta-stats";
 import { Button } from "@/components/ui/button";
@@ -54,7 +55,7 @@ export default function Home() {
     // store is a stable Zustand singleton; effect runs only once.
   }, [store]);
 
-  // Global keyboard shortcuts (help, undo/redo handled here so they work anywhere)
+  // Global keyboard shortcuts (help, undo/redo, save, new, import handled here)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName;
@@ -64,6 +65,26 @@ export default function Home() {
       if (e.shiftKey && e.key === "?") {
         e.preventDefault();
         useDiagramStore.getState().toggleShortcutsHelp();
+        return;
+      }
+      // Cmd/Ctrl+S — toggle export panel (save)
+      if ((e.metaKey || e.ctrlKey) && (e.key === "s" || e.key === "S")) {
+        e.preventDefault();
+        useDiagramStore.getState().toggleExport();
+        return;
+      }
+      // Cmd/Ctrl+N — new diagram
+      if ((e.metaKey || e.ctrlKey) && (e.key === "n" || e.key === "N") && !e.shiftKey) {
+        e.preventDefault();
+        if (confirm("Start a new diagram? Current changes will be lost (unless saved).")) {
+          window.location.href = "/";
+        }
+        return;
+      }
+      // Cmd/Ctrl+Shift+I — import JSON
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === "i" || e.key === "I")) {
+        e.preventDefault();
+        useDiagramStore.getState().toggleImportJson();
         return;
       }
       if (isEditable) return;
@@ -145,6 +166,7 @@ export default function Home() {
       <ShortcutsHelpDialog />
       <RecentDiagramsDialog />
       <VersionHistoryDialog />
+      <ImportJsonDialog />
       <Toaster richColors position="bottom-right" />
     </div>
   );
