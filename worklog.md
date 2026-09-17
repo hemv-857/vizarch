@@ -741,3 +741,106 @@ Task: Pre-warm cache, version history, batch API, SVG memoization, sidebar toggl
 5. **Mobile responsive** — pinch-to-zoom on canvas, touch-friendly node selection
 6. **Visual regression tests** — golden file comparison for SVG output
 7. **GitHub Action / Slack bot** — integrations for CI/CD diagram generation
+
+---
+Task ID: 8
+Agent: main (cron webDevReview)
+Task: Version history UI, annotations UI, WebSocket collab service, presence indicators
+
+## Current Project Status Assessment
+- vizarch is production-ready from Task 7 (pre-warm cache, version API, batch API, SVG memoization, sidebar toggle)
+- ESLint: 0 errors, 0 warnings
+- All API routes returning 200
+- VLM rating: 9/10
+- Known issues from Task 7 worklog:
+  1. Version history UI (API exists but no frontend)
+  2. Annotations UI (API exists but no frontend)
+  3. Real-time collaboration (WebSocket)
+  4. Auth + user accounts
+  5. Mobile responsive
+
+## Completed Modifications
+
+### New Features (5)
+
+1. **Version history UI dialog** (`version-history-dialog.tsx`)
+   - New dialog showing version timeline with version numbers, change summaries, timestamps
+   - "Restore" button on each version (disabled for latest/current version)
+   - Restore fetches the version's full graph, applies it to the store, re-renders SVG
+   - Empty states: "No saved diagram" (no share link), "No versions yet" (new diagram)
+   - Loading state with spinner
+   - Uses URL slug as fallback when store's shareSlug isn't set
+   - Verified: shows v1 "Initial version" + v2 "Added one node" for test diagram u64tcar0
+   - "Versions" button in header (with GitBranch icon, disabled when no share link)
+
+2. **Node annotations UI** (`node-annotations.tsx`)
+   - Embedded in NodeDetailPanel (below the doc link, with border-top separator)
+   - Shows existing annotations: author avatar, name, date, text, delete button (on hover)
+   - Add annotation form: author input + comment input + send button
+   - Empty state: "No annotations yet" (when share link exists but no annotations)
+   - Placeholder state: "Save a share link to enable annotations" (when no share link)
+   - Loads annotations filtered by nodeId via GET /api/diagrams/[slug]/annotations?nodeId=n1
+   - Uses URL slug as fallback
+   - Verified: shows 1 existing annotation "Anonymous" on node n1
+
+3. **WebSocket collab service** (`mini-services/collab-service/index.ts`)
+   - New bun mini-service on port 3003
+   - Socket.io server with room-based collaboration
+   - Events: join-room, cursor-move, select-node, diagram-update, leave-room
+   - Tracks collaborators per room (slug-based): id, name, color, cursor, selectedNodeId
+   - Auto-assigns colors (8-color palette, cycled)
+   - Broadcasts user-joined/user-left events
+   - Diagram-update broadcasts graph changes to other users in the room
+   - Graceful shutdown on SIGTERM/SIGINT
+   - Verified: service starts on port 3003, handles connections
+
+4. **Collaboration hook** (`use-collaboration.ts`)
+   - `useCollaboration()` hook for frontend WebSocket integration
+   - Connects to `/?XTransformPort=3003` via socket.io-client (through Caddy gateway)
+   - Auto-joins room when shareSlug is set
+   - Tracks: connected status, collaborators list
+   - Broadcast functions: broadcastDiagram, broadcastCursor, broadcastNodeSelection
+   - Receives: room-state, user-joined, user-left, cursor-move, select-node, diagram-update
+   - On diagram-update: parses graph JSON, re-renders SVG, applies to store
+
+5. **Presence indicator** (`presence-indicator.tsx`)
+   - Compact widget in header showing active collaborators
+   - Green Wifi icon when connected, grey WifiOff when disconnected
+   - Avatar circles (colored by collaborator color, showing first initial)
+   - Collaborator count
+   - Overflow indicator (+N) for >4 collaborators
+   - Tooltip: "N viewers online"
+
+### Bug Fixes
+- **Fixed hydration mismatch**: Using `typeof window !== "undefined" && window.location.search` in render caused SSR/client mismatch. Fixed by using useState + useEffect pattern (state starts false/null, updates after mount).
+- **Fixed shareSlug not set in store**: When loading from share URL, the store's shareSlug wasn't being persisted to localStorage, so on reload it was lost. Fixed by checking URL for share slug as fallback in version-history-dialog, node-annotations, and header components.
+- **Fixed duplicate useEffect in header**: Removed duplicate "Sync dark class" useEffect that was accidentally duplicated during editing.
+
+## Verification Results
+- ESLint: 0 errors, 0 warnings
+- Dev server: all routes 200
+- Collab service: running on port 3003
+- Agent Browser QA confirmed:
+  - Fork banner appears on `?share=` URLs ✓
+  - Version history dialog shows 2 versions (v1, v2) with Restore buttons ✓
+  - Annotations section shows 1 existing annotation on node n1 ✓
+  - "Versions" button in header (enabled when share link present) ✓
+  - No hydration errors when navigating (vs. fresh open) ✓
+- VLM verified: Versions button visible, annotations section with comments visible
+- VLM rating: 8/10 (minor: diagram cropping in screenshot viewport)
+
+## Unresolved Issues / Risks
+- **Fresh page open causes hydration error**: Opening `http://localhost:3000/?share=slug` directly (not navigating from another page) sometimes causes "Application error: a client-side exception". Navigating via `window.location.href` works. Likely a timing issue with SSR + client state sync.
+- **Collab service not auto-started**: The mini-service needs to be started manually (`bun run dev` in collab-service/). For production, would need a process manager.
+- **No auth/tiers yet**: All users are "free" tier.
+- **Mobile layout**: Touch gestures not optimized.
+- **Annotations delete**: Only removes locally (no DELETE API endpoint). In production, would need DELETE /api/diagrams/[slug]/annotations/[id].
+
+## Priority Recommendations for Next Phase
+1. **Fix hydration error on fresh open** — investigate SSR/client mismatch when loading share URL directly
+2. **Auto-start collab service** — integrate with dev server startup script
+3. **Auth + user accounts** — NextAuth.js for Pro/Enterprise tier enforcement
+4. **Mobile responsive** — pinch-to-zoom on canvas, touch-friendly node selection
+5. **Cursor sharing UI** — render remote collaborators' cursors on the canvas
+6. **Annotations DELETE endpoint** — allow removing annotations via API
+7. **Visual regression tests** — golden file comparison for SVG output

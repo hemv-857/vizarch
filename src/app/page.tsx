@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Share2, GitFork } from "lucide-react";
 import { useDiagramStore } from "@/hooks/use-diagram-store";
 import { buildSvg } from "@/lib/vizarch/svg-builder";
@@ -19,6 +19,7 @@ import { VizarchFooter } from "@/components/vizarch/footer";
 import { ServicesCatalogDialog } from "@/components/vizarch/services-catalog-dialog";
 import { ShortcutsHelpDialog } from "@/components/vizarch/shortcuts-help-dialog";
 import { RecentDiagramsDialog } from "@/components/vizarch/recent-diagrams-dialog";
+import { VersionHistoryDialog } from "@/components/vizarch/version-history-dialog";
 import { DiagramStatsPanel } from "@/components/vizarch/diagram-stats-panel";
 import { MetaStats } from "@/components/vizarch/meta-stats";
 import { Button } from "@/components/ui/button";
@@ -34,6 +35,14 @@ export default function Home() {
   const selectedNodeId = useDiagramStore((s) => s.selectedNodeId);
   const viewingShared = useDiagramStore((s) => s.viewingShared);
   const forkShared = useDiagramStore((s) => s.forkShared);
+  const shareSlug = useDiagramStore((s) => s.shareSlug);
+  const [urlHasShare, setUrlHasShare] = useState(false);
+
+  // Sync URL share param after mount (avoids hydration mismatch)
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setUrlHasShare(window.location.search.includes("share="));
+  }, []);
 
   // On first mount: load from localStorage OR kick off initial generation.
   useEffect(() => {
@@ -81,8 +90,8 @@ export default function Home() {
           <TextInputPanel />
         </section>
 
-        {/* Fork banner: shown when viewing a shared diagram */}
-        {viewingShared && (
+        {/* Fork banner: shown when viewing a shared diagram (check URL too for reliability) */}
+        {(viewingShared || urlHasShare) && (
           <div className="shrink-0 rounded-lg border border-teal-400/50 bg-teal-50 dark:bg-teal-950/30 px-3 py-2 flex items-center gap-2 text-xs">
             <Share2 className="h-3.5 w-3.5 text-teal-600 shrink-0" />
             <span className="text-teal-700 dark:text-teal-300 flex-1">
@@ -135,6 +144,7 @@ export default function Home() {
       <ServicesCatalogDialog />
       <ShortcutsHelpDialog />
       <RecentDiagramsDialog />
+      <VersionHistoryDialog />
       <Toaster richColors position="bottom-right" />
     </div>
   );

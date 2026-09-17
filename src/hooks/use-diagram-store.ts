@@ -71,6 +71,7 @@ interface DiagramState {
   showShortcutsHelp: boolean;
   showRecentPanel: boolean;
   showSidebar: boolean;   // mobile: toggle sidebar visibility
+  showVersionHistory: boolean;
 
   // Status
   status: GenerationStatus;
@@ -107,6 +108,7 @@ interface DiagramState {
   toggleShortcutsHelp: () => void;
   toggleRecentPanel: () => void;
   toggleSidebar: () => void;
+  toggleVersionHistory: () => void;
   setStatus: (s: GenerationStatus) => void;
   setError: (e: string | null) => void;
   setGraph: (g: ArchGraph) => void;
@@ -273,6 +275,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   showShortcutsHelp: false,
   showRecentPanel: false,
   showSidebar: true,
+  showVersionHistory: false,
   status: "idle",
   error: null,
   shareUrl: null,
@@ -363,6 +366,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   toggleShortcutsHelp: () => set({ showShortcutsHelp: !get().showShortcutsHelp }),
   toggleRecentPanel: () => set({ showRecentPanel: !get().showRecentPanel }),
   toggleSidebar: () => set({ showSidebar: !get().showSidebar }),
+  toggleVersionHistory: () => set({ showVersionHistory: !get().showVersionHistory }),
   setStatus: (s) => set({ status: s }),
   setError: (e) => set({ error: e, status: e ? "error" : "idle" }),
   setGraph: (g) => {

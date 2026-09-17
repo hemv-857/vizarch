@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Boxes,
   Github,
@@ -9,6 +9,7 @@ import {
   Sun,
   Keyboard,
   History,
+  GitBranch,
   PanelRightOpen,
 } from "lucide-react";
 import { useDiagramStore } from "@/hooks/use-diagram-store";
@@ -20,13 +21,22 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { PresenceIndicator } from "@/components/vizarch/presence-indicator";
 
 export function VizarchHeader() {
   const toggleCatalog = useDiagramStore((s) => s.toggleServicesCatalog);
   const toggleExport = useDiagramStore((s) => s.toggleExport);
   const toggleShortcuts = useDiagramStore((s) => s.toggleShortcutsHelp);
   const toggleRecent = useDiagramStore((s) => s.toggleRecentPanel);
+  const toggleVersionHistory = useDiagramStore((s) => s.toggleVersionHistory);
+  const shareSlug = useDiagramStore((s) => s.shareSlug);
+  const [urlHasShare, setUrlHasShare] = useState(false);
   const darkMode = useDiagramStore((s) => s.darkMode);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setUrlHasShare(window.location.search.includes("share="));
+  }, []);
   const toggleDarkMode = useDiagramStore((s) => s.toggleDarkMode);
 
   // Sync dark class on mount (in case store was loaded from localStorage)
@@ -76,6 +86,25 @@ export function VizarchHeader() {
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Recent saved diagrams</TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 px-2"
+                  onClick={toggleVersionHistory}
+                  disabled={!shareSlug && !urlHasShare}
+                  title="Version history"
+                >
+                  <GitBranch className="h-4 w-4" />
+                  <span className="hidden md:inline ml-1.5 text-xs">Versions</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                {shareSlug ? "Browse version history" : "Save a share link first"}
+              </TooltipContent>
             </Tooltip>
 
             <Tooltip>
@@ -145,6 +174,7 @@ export function VizarchHeader() {
               Share / Export
             </Button>
           </TooltipProvider>
+          <PresenceIndicator />
         </div>
       </div>
     </header>

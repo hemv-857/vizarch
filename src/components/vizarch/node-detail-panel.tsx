@@ -16,6 +16,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { getProviderLabel, getTypeLabel, TYPE_COLORS } from "@/lib/vizarch/services";
+import { NodeAnnotations } from "@/components/vizarch/node-annotations";
 import { toast } from "sonner";
 
 const BRAND_PALETTE = [
@@ -241,6 +242,11 @@ export function NodeDetailPanel() {
             <ExternalLink className="h-3 w-3" />View official docs
           </a>
         )}
+
+        {/* Node annotations */}
+        <div className="border-t border-border pt-2">
+          <NodeAnnotations nodeId={node.id} />
+        </div>
       </CardContent>
     </Card>
   );
