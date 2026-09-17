@@ -126,3 +126,60 @@ export function listTemplates() {
     edgeCount: t.edges.length,
   }));
 }
+
+// Pre-warm cache: generate all templates on server startup so first requests are instant.
+// This avoids the 5-7s LLM parse latency for template-based requests.
+let warmed = false;
+let warming = false;
+
+export async function warmupCache(): Promise<void> {
+  if (warmed || warming) return;
+  warming = true;
+  try {
+    // Generate each template in both themes (light + dark) to cover common requests
+    const themes: Array<"light" | "dark"> = ["light", "dark"];
+    const layouts: Array<"auto" | "vertical"> = ["auto", "vertical"];
+    const tasks: Promise<unknown>[] = [];
+    for (const tpl of TEMPLATES) {
+      for (const theme of themes) {
+        for (const layout of layouts) {
+          tasks.push(
+            generateDiagram({
+              templateId: tpl.id,
+              style: { theme, layout },
+              useCache: true,
+            }).catch((err) => {
+              console.warn(`[vizarch] warmup failed for ${tpl.id} (${theme}/${layout}):`, (err as Error).message);
+            }),
+          );
+        }
+      }
+    }
+    await Promise.all(tasks);
+    warmed = true;
+    console.log(`[vizarch] cache warmed: ${TEMPLATES.length} templates × ${themes.length} themes × ${layouts.length} layouts = ${tasks.length} entries`);
+  } finally {
+    warming = false;
+  }
+}
+
+export function isWarmedUp(): boolean {
+  return warmed;
+}
+
+// Batch generate: process multiple diagrams in parallel
+export async function batchGenerate(
+  requests: GenerateRequest[],
+): Promise<{ results: (DiagramResult | { error: string })[]; totalMs: number }> {
+  const t0 = Date.now();
+  const results = await Promise.all(
+    requests.map(async (req) => {
+      try {
+        return await generateDiagram(req);
+      } catch (err) {
+        return { error: (err as Error).message };
+      }
+    }),
+  );
+  return { results, totalMs: Date.now() - t0 };
+}

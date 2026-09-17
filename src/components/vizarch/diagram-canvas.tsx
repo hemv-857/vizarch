@@ -13,6 +13,8 @@ import {
   Eye,
   EyeOff,
   AlertCircle,
+  PanelRightClose,
+  PanelRightOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MiniMap } from "@/components/vizarch/mini-map";
@@ -183,12 +185,21 @@ export function DiagramCanvas() {
         <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => { setZoom(zoom * 0.8); setAutoFit(false); }} title="Zoom out (−)">
           <ZoomOut className="h-3.5 w-3.5" />
         </Button>
-        <Button variant="ghost" size="sm" className="h-7 px-2 text-[11px]" onClick={() => { resetView(); setAutoFit(true); }} title="Fit to screen (0)">
+        <Button variant="ghost" size="sm" className="h-7 px-2 text-[11px]" onClick={() => { resetView(); setAutoFit(true); }} title="Fit to screen (F)">
           <Maximize className="h-3.5 w-3.5 mr-1" />Fit
         </Button>
         <div className="px-1.5 text-[11px] text-muted-foreground tabular-nums border-l border-border ml-0.5">
           {Math.round(zoom * 100)}%
         </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 w-7 p-0 border-l border-border ml-0.5"
+          onClick={() => useDiagramStore.getState().toggleSidebar()}
+          title="Toggle sidebar"
+        >
+          {useDiagramStore.getState().showSidebar ? <PanelRightClose className="h-3.5 w-3.5" /> : <PanelRightOpen className="h-3.5 w-3.5" />}
+        </Button>
       </div>
 
       {/* Layer indicator (top-left) */}

@@ -162,7 +162,7 @@ export function TextInputPanel() {
             aria-label="Diagram title"
           />
           <div className="h-4 w-px bg-border shrink-0" />
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0" title={description || `Template: ${TEMPLATES.find((t) => t.id === store.templateId)?.name ?? "—"}`}>
             <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Architecture description</div>
             <div className="text-xs text-foreground/90 truncate font-mono">
               {description || `Template: ${TEMPLATES.find((t) => t.id === store.templateId)?.name ?? "—"}`}

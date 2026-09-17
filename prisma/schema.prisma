@@ -40,6 +40,34 @@ model Diagram {
   viewCount   Int      @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  versions    DiagramVersion[]
 
   @@index([slug])
+}
+
+// vizarch: version history for diagrams (tracks revisions)
+model DiagramVersion {
+  id          String   @id @default(cuid())
+  diagramId   String
+  version     Int      // version number (1, 2, 3...)
+  graphJson   String   // snapshot of graph at this version
+  styleJson   String?
+  svgCache    String?
+  changeSummary String? // optional: what changed
+  createdAt   DateTime @default(now())
+  diagram     Diagram  @relation(fields: [diagramId], references: [id], onDelete: Cascade)
+
+  @@index([diagramId])
+}
+
+// vizarch: node annotations/comments (for collaboration)
+model NodeAnnotation {
+  id          String   @id @default(cuid())
+  diagramSlug String   // which diagram this annotation belongs to
+  nodeId      String   // which node in the graph
+  author      String   // anonymous by default (e.g. "Anonymous")
+  text        String   // comment text
+  createdAt   DateTime @default(now())
+
+  @@index([diagramSlug, nodeId])
 }

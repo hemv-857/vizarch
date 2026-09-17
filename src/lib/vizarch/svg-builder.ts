@@ -45,10 +45,46 @@ function nodeColor(node: ArchNode, style?: ArchStyle): string {
 const NODE_W = 160;
 const NODE_H = 88;
 
+// SVG memoization cache: hash graph+opts → cached SVG result
+// Prevents re-rendering identical diagrams (e.g. during hover state changes
+// when the graph itself hasn't changed)
+const SVG_CACHE = new Map<string, { svg: string; width: number; height: number }>();
+const SVG_CACHE_LIMIT = 50;
+
+function graphHash(graph: ArchGraph, opts: SvgRenderOptions): string {
+  // Simple hash: combine node positions, edge ids, and options
+  // Note: we include selectedNodeId etc in the hash so different selections produce different SVGs
+  const nodeSig = graph.nodes
+    .filter((n) => !n.hidden)
+    .map((n) => `${n.id}:${n.x},${n.y}:${n.label}:${n.customColor ?? ""}`)
+    .join("|");
+  const edgeSig = graph.edges
+    .filter((e) => !e.hidden)
+    .map((e) => `${e.id}:${e.from}->${e.to}:${e.protocol}:${e.label}:${e.style}`)
+    .join("|");
+  const optsSig = [
+    opts.theme ?? "light",
+    opts.iconSize ?? "md",
+    opts.showNodeLabels ? "1" : "0",
+    opts.showEdgeLabels ? "1" : "0",
+    opts.selectedNodeId ?? "",
+    opts.selectedEdgeId ?? "",
+    opts.hoveredNodeId ?? "",
+    opts.connectModeFromId ?? "",
+    graph.style?.colorMode ?? "type",
+    graph.style?.edgeStyle ?? "solid",
+  ].join(",");
+  return `${nodeSig}||${edgeSig}||${optsSig}`;
+}
+
 export function buildSvg(
   graph: ArchGraph,
   opts: SvgRenderOptions = {},
 ): { svg: string; width: number; height: number } {
+  // Check memoization cache
+  const hash = graphHash(graph, opts);
+  const cached = SVG_CACHE.get(hash);
+  if (cached) return cached;
   const theme = opts.theme ?? "light";
   const pad = opts.pad ?? 40;
   const showLabels = opts.showNodeLabels ?? true;
@@ -184,5 +220,18 @@ export function buildSvg(
   <g class="edges">${edgePaths.join("\n  ")}${edgeLabels.length ? "\n  " + edgeLabels.join("\n  ") : ""}</g>
   <g class="nodes">${nodeGroups.join("\n  ")}</g>
 </svg>`;
-  return { svg, width, height };
+  const result = { svg, width, height };
+  // Cache for future identical renders
+  if (SVG_CACHE.size >= SVG_CACHE_LIMIT) {
+    // Evict oldest entry (FIFO)
+    const firstKey = SVG_CACHE.keys().next().value;
+    if (firstKey) SVG_CACHE.delete(firstKey);
+  }
+  SVG_CACHE.set(hash, result);
+  return result;
+}
+
+// Clear the SVG cache (useful for testing or memory management)
+export function clearSvgCache(): void {
+  SVG_CACHE.clear();
 }

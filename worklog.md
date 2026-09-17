@@ -630,3 +630,114 @@ Task: Fix mini-map viewport accuracy, add rate limiting, fork shared diagrams, c
 5. **Version history** — track diagram revisions with diff visualization
 6. **Performance: SVG memoization** — memoize SVG string by graph hash for 100+ node diagrams
 7. **Visual regression tests** — golden file comparison for SVG output
+
+---
+Task ID: 7
+Agent: main (cron webDevReview)
+Task: Pre-warm cache, version history, batch API, SVG memoization, sidebar toggle, annotations
+
+## Current Project Status Assessment
+- vizarch is production-ready from Task 6 (mini-map fix, rate limiting, fork, cURL, template badges)
+- ESLint: 0 errors, 0 warnings
+- All API routes returning 200
+- VLM rating: 9/10
+- Known issues from Task 6 worklog:
+  1. Pre-warm cache on startup (top priority)
+  2. Real-time collaboration (WebSocket)
+  3. Auth + user accounts
+  4. Mobile responsive
+  5. Version history
+  6. SVG memoization
+
+## Completed Modifications
+
+### New Features (8)
+
+1. **Pre-warm cache on startup** (`diagram-service.ts` + `warmup/route.ts`)
+   - New `warmupCache()` function generates all 10 templates × 2 themes × 2 layouts = 40 cache entries
+   - New POST/GET `/api/v1/warmup` endpoint to trigger and check warmup status
+   - Page.tsx triggers warmup on mount via `fetch("/api/v1/warmup", { method: "POST" })`
+   - Verified: after warmup, template requests return in <30ms (was 5-7s for LLM, 0ms for templates)
+   - `isWarmedUp()` helper to check status
+
+2. **Version history for diagrams** (`prisma/schema.prisma` + `versions/route.ts` + `versions/[version]/route.ts`)
+   - New `DiagramVersion` model: id, diagramId, version, graphJson, styleJson, svgCache, changeSummary, createdAt
+   - Diagram has many versions (cascade delete)
+   - POST `/api/diagrams` now creates version 1 with "Initial version" summary
+   - GET `/api/diagrams/[slug]/versions` — list all versions
+   - POST `/api/diagrams/[slug]/versions` — save a new version (auto-increments version number, updates diagram's current state)
+   - GET `/api/diagrams/[slug]/versions/[version]` — get specific version's full graph
+   - Export panel "Save new version" button: if shareSlug exists, saves a new version instead of creating a new diagram
+   - Verified: saved v1, then v2 with "Added one node", listed both versions correctly
+
+3. **Batch generate API** (`batch/route.ts` + `batchGenerate()` in diagram-service)
+   - New POST `/api/v1/batch` endpoint
+   - Accepts `{ diagrams: [{ description?, templateId?, style? }, ...] }` (max 20 per request)
+   - Processes all in parallel via `Promise.all`
+   - Returns `{ ok, count, totalMs, results: [...] }` with per-diagram success/error
+   - Rate-limited (counts as 1 request against the batch endpoint quota)
+   - Verified: 3 templates generated in 1ms total (all from cache)
+
+4. **SVG memoization** (`svg-builder.ts`)
+   - New `graphHash()` function: combines node positions, edge ids, and all render options into a hash key
+   - `buildSvg()` checks the cache first, returns cached result if hash matches
+   - Cache stores up to 50 entries (FIFO eviction)
+   - Prevents re-rendering identical diagrams (e.g. during hover state changes when graph hasn't changed)
+   - `clearSvgCache()` helper for testing
+   - Performance: eliminates redundant SVG generation for identical graph+option combinations
+
+5. **Node annotations/comments** (`prisma/schema.prisma` + `annotations/route.ts`)
+   - New `NodeAnnotation` model: id, diagramSlug, nodeId, author, text, createdAt
+   - Indexed on (diagramSlug, nodeId) for efficient lookups
+   - GET `/api/diagrams/[slug]/annotations?nodeId=n1` — list annotations (optionally filtered by node)
+   - POST `/api/diagrams/[slug]/annotations` — add annotation with author + text
+   - Verified: created 2 annotations on different nodes, listed correctly
+
+6. **Collapsible sidebar** (`use-diagram-store.ts` + `page.tsx` + `diagram-canvas.tsx`)
+   - New `showSidebar` boolean in store (default: true)
+   - `toggleSidebar()` action
+   - Page layout: when `showSidebar` is false, grid becomes `lg:grid-cols-1` (canvas only, no sidebar)
+   - Sidebar toggle button in canvas toolbar (PanelRightClose/PanelRightOpen icons)
+   - Verified: clicking hides sidebar, clicking again restores it
+
+7. **Description tooltip** (`text-input-panel.tsx`)
+   - Collapsed input bar now has `title` attribute on the description container with the full text
+   - Users can hover to see the complete architecture description even when it's truncated
+   - Verified: tooltip shows "React frontend on Vercel, Node.js API on Lambda, P..."
+
+8. **Mini-map label improvement** (`mini-map.tsx`)
+   - Label font size: 8px → 9px for better readability
+
+### Bug Fixes
+- **Fixed Prisma client not picking up new models**: After adding DiagramVersion and NodeAnnotation to schema, the dev server's cached PrismaClient singleton didn't have the new models. Fixed by restarting the dev server (which clears the singleton and re-imports the regenerated client).
+
+## Verification Results
+- ESLint: 0 errors, 0 warnings
+- Dev server: all routes 200, no runtime errors (after restart)
+- API tests confirmed:
+  - Warmup: `POST /api/v1/warmup` returns `{ok: true, alreadyWarmed: true}` ✓
+  - Warmup status: `GET /api/v1/warmup` returns `{warmed: true}` ✓
+  - Cached template: 24ms total, cacheHit: true on second call ✓
+  - Batch: 3 diagrams in 1ms total ✓
+  - Version history: saved v1 + v2, listed both with change summaries ✓
+  - Annotations: created 2 annotations, listed by diagram slug ✓
+  - Sidebar toggle: hides/restores sidebar on click ✓
+  - Description tooltip: full text on hover ✓
+- VLM final rating: 9/10 ("clean, professional, highly functional")
+
+## Unresolved Issues / Risks
+- **Rate limiting is in-memory only**: Server restart resets all counters. For production, would need Redis or database-backed tracking.
+- **No auth/tiers yet**: All users are "free" tier. Pro/Enterprise require NextAuth.js + user accounts.
+- **Mobile layout**: Sidebar toggle helps but touch gestures (pinch-to-zoom) not yet optimized.
+- **Real-time collaboration**: WebSocket mini-service not yet implemented.
+- **Version history UI**: API exists but no frontend UI to browse/restore old versions yet.
+- **Annotations UI**: API exists but no frontend UI to view/add comments on nodes yet.
+
+## Priority Recommendations for Next Phase
+1. **Version history UI** — dialog showing version timeline with restore buttons
+2. **Annotations UI** — comment panel in node detail, showing annotations for the selected node
+3. **Real-time collaboration** — WebSocket via socket.io mini-service for multi-user editing
+4. **Auth + user accounts** — NextAuth.js for Pro/Enterprise tier enforcement
+5. **Mobile responsive** — pinch-to-zoom on canvas, touch-friendly node selection
+6. **Visual regression tests** — golden file comparison for SVG output
+7. **GitHub Action / Slack bot** — integrations for CI/CD diagram generation

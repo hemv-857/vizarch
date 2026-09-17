@@ -129,7 +129,7 @@ export function MiniMap() {
           }}
         />
       )}
-      <div className="absolute top-1 left-1 text-[8px] text-muted-foreground font-medium uppercase tracking-wider pointer-events-none">
+      <div className="absolute top-1 left-1 text-[9px] text-muted-foreground font-medium uppercase tracking-wider pointer-events-none">
         Mini-map
       </div>
     </div>

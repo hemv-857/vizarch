@@ -102,24 +102,46 @@ export function ExportPanel() {
     }
     setBusy("share");
     try {
-      const res = await fetch("/api/diagrams", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: diagramTitle || `${graph.nodes.length}-node architecture`,
-          description: useDiagramStore.getState().description || "template",
-          graphJson: JSON.stringify(graph),
-          styleJson: JSON.stringify(graph.style ?? {}),
-          svgCache: svg,
-        }),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      const url = `${window.location.origin}/?share=${data.diagram.slug}`;
-      setShareUrl(url);
-      setShareSlug(data.diagram.slug);
-      await navigator.clipboard.writeText(url).catch(() => {});
-      toast.success("Share link copied to clipboard");
+      // If we already have a shareSlug, save a new version instead of creating a new diagram
+      if (shareSlug) {
+        const verRes = await fetch(`/api/diagrams/${shareSlug}/versions`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            graphJson: JSON.stringify(graph),
+            styleJson: JSON.stringify(graph.style ?? {}),
+            svgCache: svg,
+            changeSummary: `Updated: ${graph.nodes.length} nodes, ${graph.edges.length} edges`,
+          }),
+        });
+        if (verRes.ok) {
+          const verData = await verRes.json();
+          await navigator.clipboard.writeText(shareUrl ?? "").catch(() => {});
+          toast.success(`Version ${verData.version?.version ?? "saved"} — share link unchanged`);
+        } else {
+          throw new Error(`HTTP ${verRes.status}`);
+        }
+      } else {
+        // First save: create new diagram with version 1
+        const res = await fetch("/api/diagrams", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: diagramTitle || `${graph.nodes.length}-node architecture`,
+            description: useDiagramStore.getState().description || "template",
+            graphJson: JSON.stringify(graph),
+            styleJson: JSON.stringify(graph.style ?? {}),
+            svgCache: svg,
+          }),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        const url = `${window.location.origin}/?share=${data.diagram.slug}`;
+        setShareUrl(url);
+        setShareSlug(data.diagram.slug);
+        await navigator.clipboard.writeText(url).catch(() => {});
+        toast.success("Share link copied — version 1 saved");
+      }
     } catch (err) {
       toast.error(`Share failed: ${(err as Error).message}`);
     } finally {
@@ -170,7 +192,7 @@ export function ExportPanel() {
             ) : (
               <LinkIcon className="h-3.5 w-3.5 mr-1.5" />
             )}
-            Generate share link
+            {shareSlug ? "Save new version" : "Generate share link"}
           </Button>
           {shareUrl && (
             <div className="space-y-1.5">

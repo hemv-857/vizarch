@@ -40,6 +40,8 @@ export default function Home() {
     if (didInit.current) return;
     didInit.current = true;
     void initApp(store);
+    // Trigger cache warmup in the background (templates × themes × layouts)
+    fetch("/api/v1/warmup", { method: "POST" }).catch(() => {});
     // store is a stable Zustand singleton; effect runs only once.
   }, [store]);
 
@@ -107,12 +109,13 @@ export default function Home() {
         {/* Lower: canvas + side panels (fills remaining height) */}
         <section
           aria-label="Diagram editor"
-          className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-3 flex-1 min-h-[360px] min-h-0"
+          className={`grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-3 flex-1 min-h-[360px] min-h-0 ${store.showSidebar ? "" : "lg:grid-cols-1"}`}
         >
           <div className="h-full min-h-[320px] order-1">
             <DiagramCanvas />
           </div>
-          <div className="order-2 flex flex-col gap-3 min-h-0 overflow-y-auto max-h-[calc(100vh-180px)]">
+          {store.showSidebar && (
+            <div className="order-2 flex flex-col gap-3 min-h-0 overflow-y-auto max-h-[calc(100vh-180px)]">
             {selectedEdgeId ? (
               <EdgeDetailPanel key={selectedEdgeId} />
             ) : selectedNodeId ? (
@@ -124,7 +127,8 @@ export default function Home() {
               </>
             )}
             {store.showExport && <ExportPanel />}
-          </div>
+            </div>
+          )}
         </section>
       </main>
       <VizarchFooter />

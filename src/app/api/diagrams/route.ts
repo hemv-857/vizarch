@@ -64,6 +64,20 @@ export async function POST(req: NextRequest) {
     },
   });
 
+  // Create version 1 (initial snapshot)
+  await db.diagramVersion.create({
+    data: {
+      diagramId: diagram.id,
+      version: 1,
+      graphJson: parsed.data.graphJson,
+      styleJson: parsed.data.styleJson ?? null,
+      svgCache: parsed.data.svgCache ?? null,
+      changeSummary: "Initial version",
+    },
+  }).catch(() => {
+    // version creation is best-effort
+  });
+
   return NextResponse.json({ ok: true, diagram }, { status: 201 });
 }
 
