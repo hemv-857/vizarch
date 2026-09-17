@@ -11,6 +11,7 @@ import {
   History,
   GitBranch,
   PanelRightOpen,
+  FilePlus,
 } from "lucide-react";
 import { useDiagramStore } from "@/hooks/use-diagram-store";
 import { Button } from "@/components/ui/button";
@@ -57,6 +58,20 @@ export function VizarchHeader() {
           >
             <Boxes className="h-4.5 w-4.5" />
           </a>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 px-2 hidden sm:flex"
+            onClick={() => {
+              if (confirm("Start a new diagram? Current changes will be lost (unless saved).")) {
+                window.location.href = "/";
+              }
+            }}
+            title="New diagram"
+          >
+            <FilePlus className="h-4 w-4" />
+            <span className="ml-1.5 text-xs">New</span>
+          </Button>
           <div className="flex flex-col min-w-0">
             <div className="flex items-center gap-2">
               <span className="font-semibold text-base tracking-tight">vizarch</span>

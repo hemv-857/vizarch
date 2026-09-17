@@ -844,3 +844,101 @@ Task: Version history UI, annotations UI, WebSocket collab service, presence ind
 5. **Cursor sharing UI** — render remote collaborators' cursors on the canvas
 6. **Annotations DELETE endpoint** — allow removing annotations via API
 7. **Visual regression tests** — golden file comparison for SVG output
+
+---
+Task ID: 9
+Agent: main (cron webDevReview)
+Task: Fix mini-map overlap, annotations DELETE, new templates, New button, copy-to-clipboard, collab cursors
+
+## Current Project Status Assessment
+- vizarch is production-ready from Task 8 (version history UI, annotations UI, WebSocket collab, presence)
+- ESLint: 0 errors, 0 warnings
+- All API routes returning 200
+- Collab service running on port 3003
+- VLM rating: 8/10
+- Known issues from Task 8 worklog:
+  1. Fresh page open hydration error (now resolved!)
+  2. Collab service not auto-started
+  3. No auth/tiers
+  4. Mobile layout
+  5. Cursor sharing UI
+  6. Annotations DELETE endpoint
+
+## Completed Modifications
+
+### Bug Fixes
+1. **Fixed mini-map overlap** (`mini-map.tsx`) — moved mini-map from `bottom-2` to `bottom-10` so it doesn't overlap the canvas bottom edge
+2. **Fixed footer positioning** (`footer.tsx`) — made footer more compact (py-2 instead of py-3, text-[10px] instead of text-[11px], h-4 icon instead of h-5), added `shrink-0` to prevent compression, responsive text hiding on smaller screens
+3. **Hydration error resolved** — the fresh-page-open hydration error from Task 8 no longer occurs (verified by Agent Browser: opening `http://localhost:3000/?share=u64tcar0` directly works without error)
+
+### New Features (6)
+
+1. **Annotations DELETE API** (`annotations/[id]/route.ts`)
+   - New DELETE `/api/diagrams/[slug]/annotations/[id]` endpoint
+   - Deletes annotation by ID, returns 404 if not found
+   - Node annotations component updated to call the DELETE API (was local-only before)
+   - Optimistic deletion: removes locally even if API fails
+   - Verified: created annotation, deleted via API, got `{ok: true}`
+
+2. **3 new preset templates** (`templates.ts`) — Total now 13
+   - **E-commerce Platform** (12 nodes): Storefront → CloudFront → LB → 3 microservices → Postgres + Redis + Elasticsearch + Stripe + S3 + CloudWatch
+   - **IoT Platform** (9 nodes): IoT Devices → IoT Core → Kinesis → Lambda → DynamoDB + S3 + SNS + Elasticsearch + Grafana (with MQTT protocol)
+   - **Web3 / Blockchain** (9 nodes): dApp → Cloudflare → IPFS → Smart Contract → RPC Node → Graph Indexer + Redis + Postgres + Metamask
+
+3. **"New diagram" button** (`header.tsx`)
+   - New FilePlus icon button in header (hidden on mobile)
+   - Click → confirmation dialog → navigates to `/` (fresh start)
+   - Prevents accidental data loss with confirm prompt
+
+4. **Copy to clipboard export buttons** (`export-panel.tsx`)
+   - 3 new buttons below the format grid: "Copy SVG", "Copy JSON", "Copy MD"
+   - Each copies the respective format to the system clipboard
+   - Toast confirmation on success
+   - No file download needed for quick sharing
+
+5. **Collaborator cursors overlay** (`collaborator-cursors.tsx`)
+   - New component that renders colored cursor arrows for each connected collaborator
+   - SVG cursor shape with collaborator's color + name label
+   - Positioned absolutely on the canvas
+   - Smooth transition animation (100ms ease-out)
+   - Only renders when connected and collaborators have active cursors
+
+6. **Improved footer** (`footer.tsx`)
+   - Compact single-line layout (py-2, text-[10px])
+   - Responsive: hides secondary text on smaller screens (sm/md/lg breakpoints)
+   - Smaller logo icon (h-4 w-4)
+   - Added `shrink-0` to prevent compression
+
+## Verification Results
+- ESLint: 0 errors, 0 warnings
+- Dev server: all routes 200
+- Collab service: running on port 3003
+- Agent Browser QA confirmed:
+  - Fresh share link open works without hydration error ✓
+  - Version history dialog shows 2 versions with Restore buttons ✓
+  - Annotations section shows existing annotations ✓
+  - "New" button visible in header ✓
+  - Copy SVG/JSON/MD buttons visible in export panel ✓
+  - 3 new templates visible (E-commerce 12, IoT 9, Web3 9) ✓
+  - Mini-map repositioned (bottom-10) ✓
+  - Footer compact, no overlap ✓
+- API tests confirmed:
+  - POST `/api/diagrams/97yh2clf/annotations` → 201 (created) ✓
+  - DELETE `/api/diagrams/97yh2clf/annotations/[id]` → 200 (deleted) ✓
+- VLM final rating: 8/10 (clean, professional, good info density)
+
+## Unresolved Issues / Risks
+- **Collab service not auto-started**: The mini-service needs manual start. For production, would need a process manager or integrated startup script.
+- **No auth/tiers yet**: All users are "free" tier.
+- **Mobile layout**: Touch gestures not optimized.
+- **Cursor sharing UI**: Component created but not wired into the canvas (needs wrapRef + mouse move broadcasting)
+- **Rate limiting is in-memory only**: Server restart resets counters.
+
+## Priority Recommendations for Next Phase
+1. **Wire collaborator cursors into canvas** — add mousemove listener that broadcasts cursor position, render CollaboratorCursors component in the canvas wrap
+2. **Auto-start collab service** — integrate with dev server startup script
+3. **Auth + user accounts** — NextAuth.js for Pro/Enterprise tier enforcement
+4. **Mobile responsive** — pinch-to-zoom on canvas, touch-friendly node selection
+5. **Visual regression tests** — golden file comparison for SVG output
+6. **Rate limiting persistence** — use database or Redis for rate limit counters
+7. **GitHub Action / Slack bot** — integrations for CI/CD diagram generation

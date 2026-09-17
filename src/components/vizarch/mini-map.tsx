@@ -109,7 +109,7 @@ export function MiniMap() {
 
   return (
     <div
-      className="absolute bottom-2 right-2 z-10 rounded-lg border border-border bg-background/90 backdrop-blur shadow-sm overflow-hidden"
+      className="absolute bottom-10 right-2 z-10 rounded-lg border border-border bg-background/90 backdrop-blur shadow-sm overflow-hidden"
       style={{ width: MINI_W, height: MINI_H }}
     >
       <div

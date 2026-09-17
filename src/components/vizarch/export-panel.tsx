@@ -177,6 +177,45 @@ export function ExportPanel() {
           ))}
         </div>
 
+        {/* Copy to clipboard buttons */}
+        <div className="flex gap-1.5">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 flex-1 text-[11px]"
+            onClick={() => {
+              navigator.clipboard.writeText(svg);
+              toast.success("SVG copied to clipboard");
+            }}
+          >
+            <Copy className="h-3 w-3 mr-1" />Copy SVG
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 flex-1 text-[11px]"
+            onClick={() => {
+              if (!graph) return;
+              navigator.clipboard.writeText(exportJson(graph));
+              toast.success("JSON copied to clipboard");
+            }}
+          >
+            <Copy className="h-3 w-3 mr-1" />Copy JSON
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 flex-1 text-[11px]"
+            onClick={() => {
+              if (!graph) return;
+              navigator.clipboard.writeText(exportMarkdown(graph));
+              toast.success("Markdown copied to clipboard");
+            }}
+          >
+            <Copy className="h-3 w-3 mr-1" />Copy MD
+          </Button>
+        </div>
+
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
             <span className="text-[11px] text-muted-foreground">Public share link</span>

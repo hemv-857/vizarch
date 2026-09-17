@@ -75,10 +75,19 @@ export function NodeAnnotations({ nodeId }: { nodeId: string }) {
   }
 
   async function handleDelete(id: string) {
-    // Note: we don't have a DELETE endpoint for annotations yet, so we just remove locally
-    // In production, we'd call DELETE /api/diagrams/[slug]/annotations/[id]
-    setAnnotations((prev) => prev.filter((a) => a.id !== id));
-    toast.success("Annotation removed");
+    if (!shareSlug) return;
+    try {
+      const res = await fetch(`/api/diagrams/${shareSlug}/annotations/${id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setAnnotations((prev) => prev.filter((a) => a.id !== id));
+      toast.success("Annotation removed");
+    } catch (err) {
+      // Remove locally even if API fails (optimistic)
+      setAnnotations((prev) => prev.filter((a) => a.id !== id));
+      toast.error(`Delete failed: ${(err as Error).message}`);
+    }
   }
 
   if (!shareSlug) {
