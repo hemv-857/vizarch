@@ -11,9 +11,10 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Search, ExternalLink } from "lucide-react";
+import { Search, ExternalLink, Plus } from "lucide-react";
 import { SERVICES, getProviderLabel, getTypeLabel } from "@/lib/vizarch/services";
-import type { ServiceProvider, ServiceType } from "@/lib/vizarch/services";
+import type { ServiceProvider, ServiceType, ServiceMeta } from "@/lib/vizarch/services";
+import { toast } from "sonner";
 
 const PROVIDERS: (ServiceProvider | "all")[] = ["all", "aws", "gcp", "azure", "kubernetes", "generic"];
 const TYPES: (ServiceType | "all")[] = [
@@ -115,48 +116,75 @@ function CatalogBody() {
       <div className="flex-1 min-h-0 overflow-y-auto">
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 p-3">
           {filtered.map((s) => (
-            <div
-              key={s.id}
-              className="rounded-md border border-border bg-card p-2 hover:border-teal-400/60 hover:shadow-sm transition"
-            >
-              <div className="flex items-center gap-2 mb-1.5">
-                <div
-                  className="flex h-7 w-7 items-center justify-center rounded shrink-0"
-                  style={{ background: (s.brandColor ?? "#3b82f6") + "22" }}
-                >
-                  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke={s.brandColor ?? "#3b82f6"} strokeWidth={1.6}>
-                    <path d={s.iconPath} strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="text-[12px] font-medium truncate">{s.name}</div>
-                  <div className="text-[9px] text-muted-foreground truncate">{s.id}</div>
-                </div>
-              </div>
-              <div className="flex items-center gap-1 mb-1">
-                <Badge variant="outline" className="text-[9px] h-3.5 px-1">{getProviderLabel(s.provider)}</Badge>
-                <Badge variant="secondary" className="text-[9px] h-3.5 px-1">{getTypeLabel(s.type)}</Badge>
-              </div>
-              <div className="text-[10px] text-muted-foreground line-clamp-2 leading-snug">
-                {s.description}
-              </div>
-              {s.docLink && (
-                <a
-                  href={s.docLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-0.5 text-[9px] text-teal-600 hover:underline mt-1"
-                >
-                  <ExternalLink className="h-2 w-2" />docs
-                </a>
-              )}
-            </div>
+            <ServiceCard key={s.id} service={s} />
           ))}
         </div>
         {filtered.length === 0 && (
           <div className="p-8 text-center text-sm text-muted-foreground">
             No services match your filter.
           </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ServiceCard({ service: s }: { service: ServiceMeta }) {
+  const addNode = useDiagramStore((st) => st.addNode);
+  const graph = useDiagramStore((st) => st.graph);
+
+  function handleInsert() {
+    if (!graph) {
+      toast.error("Generate or load a diagram first, then add services.");
+      return;
+    }
+    const id = addNode(s);
+    if (id) toast.success(`Added "${s.name}" to canvas`);
+  }
+
+  return (
+    <div
+      className="rounded-md border border-border bg-card p-2 hover:border-teal-400/60 hover:shadow-sm transition group flex flex-col"
+    >
+      <div className="flex items-center gap-2 mb-1.5">
+        <div
+          className="flex h-7 w-7 items-center justify-center rounded shrink-0"
+          style={{ background: (s.brandColor ?? "#3b82f6") + "22" }}
+        >
+          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke={s.brandColor ?? "#3b82f6"} strokeWidth={1.6}>
+            <path d={s.iconPath} strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="text-[12px] font-medium truncate">{s.name}</div>
+          <div className="text-[9px] text-muted-foreground truncate">{s.id}</div>
+        </div>
+      </div>
+      <div className="flex items-center gap-1 mb-1">
+        <Badge variant="outline" className="text-[9px] h-3.5 px-1">{getProviderLabel(s.provider)}</Badge>
+        <Badge variant="secondary" className="text-[9px] h-3.5 px-1">{getTypeLabel(s.type)}</Badge>
+      </div>
+      <div className="text-[10px] text-muted-foreground line-clamp-2 leading-snug flex-1">
+        {s.description}
+      </div>
+      <div className="flex items-center gap-1 mt-1.5 pt-1.5 border-t border-border/60">
+        <button
+          type="button"
+          onClick={handleInsert}
+          className="inline-flex items-center gap-1 text-[10px] font-medium text-teal-700 dark:text-teal-300 hover:bg-teal-50 dark:hover:bg-teal-950/30 px-1.5 py-0.5 rounded transition"
+          title="Insert this service into the current diagram"
+        >
+          <Plus className="h-3 w-3" />Add to canvas
+        </button>
+        {s.docLink && (
+          <a
+            href={s.docLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-0.5 text-[9px] text-muted-foreground hover:text-foreground ml-auto"
+          >
+            <ExternalLink className="h-2.5 w-2.5" />docs
+          </a>
         )}
       </div>
     </div>

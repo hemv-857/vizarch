@@ -8,7 +8,16 @@ import type { ServiceMeta } from "@/lib/vizarch/services";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Sparkles, Wand2, Loader2, FileText, Trash2 } from "lucide-react";
+import {
+  Sparkles,
+  Wand2,
+  Loader2,
+  FileText,
+  Trash2,
+  ChevronDown,
+  ChevronUp,
+  Pencil,
+} from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -22,6 +31,8 @@ export function TextInputPanel() {
   const store = useDiagramStore();
   const description = useDiagramStore((s) => s.description);
   const status = useDiagramStore((s) => s.status);
+  const meta = useDiagramStore((s) => s.meta);
+  const graph = useDiagramStore((s) => s.graph);
   const setDescription = useDiagramStore((s) => s.setDescription);
   const setTemplate = useDiagramStore((s) => s.setTemplate);
   const applyGraph = useDiagramStore((s) => s.applyGraph);
@@ -31,9 +42,19 @@ export function TextInputPanel() {
   const [autoOpen, setAutoOpen] = useState(false);
   const [acItems, setAcItems] = useState<ServiceMeta[]>([]);
   const [taFocused, setTaFocused] = useState(false);
+  const [expanded, setExpanded] = useState(true);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const wordCount = description.trim() ? description.trim().split(/\s+/).length : 0;
   const charCount = description.length;
+
+  // Auto-collapse once a diagram has been generated; auto-expand if user clears
+  useEffect(() => {
+    if (graph && graph.nodes.length > 0 && meta) {
+      setExpanded(false);
+    } else {
+      setExpanded(true);
+    }
+  }, [graph?.nodes.length, meta]);
 
   // Autocomplete: show popover when user is typing a token
   useEffect(() => {
@@ -42,7 +63,6 @@ export function TextInputPanel() {
       setAutoOpen(false);
       return;
     }
-    // Find the token currently being typed (last word up to comma/newline)
     const tail = description.split(/[,;\n]/).pop() ?? "";
     const token = tail.trim().split(/\s+/).pop() ?? "";
     if (token.length < 2) {
@@ -56,10 +76,8 @@ export function TextInputPanel() {
   }, [description]);
 
   function insertService(meta: ServiceMeta) {
-    // Replace the last token with the canonical service name.
     const parts = description.split(/([,;\n])/);
     if (parts.length === 0) return;
-    // last non-delimiter part is the current phrase
     const lastPhraseIdx = parts.length - 1;
     const phrase = parts[lastPhraseIdx];
     const tokens = phrase.trim().split(/\s+/);
@@ -126,6 +144,58 @@ export function TextInputPanel() {
     }
   }
 
+  // Collapsed (post-generation) view: thin bar with description + edit + regenerate
+  if (!expanded && graph && graph.nodes.length > 0) {
+    return (
+      <div className="rounded-xl border border-border/60 bg-card shadow-sm">
+        <div className="flex items-center gap-2 p-2.5">
+          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-gradient-to-br from-teal-500/20 to-emerald-500/20 shrink-0">
+            <Wand2 className="h-3.5 w-3.5 text-teal-600" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Architecture description</div>
+            <div className="text-xs text-foreground/90 truncate font-mono">
+              {description || `Template: ${TEMPLATES.find((t) => t.id === store.templateId)?.name ?? "—"}`}
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 text-xs"
+            onClick={() => {
+              setExpanded(true);
+              requestAnimationFrame(() => taRef.current?.focus());
+            }}
+          >
+            <Pencil className="h-3 w-3 mr-1" />Edit
+          </Button>
+          <Button
+            onClick={handleGenerate}
+            disabled={status === "loading" || !description.trim()}
+            className="h-7 gap-1.5 bg-gradient-to-br from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white"
+          >
+            {status === "loading" ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <Sparkles className="h-3 w-3" />
+            )}
+            Regenerate
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 w-7 p-0"
+            onClick={() => setExpanded(true)}
+            title="Expand"
+          >
+            <ChevronDown className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Expanded view: full input with presets + examples
   return (
     <div className="rounded-xl border border-border/60 bg-card shadow-sm">
       <div className="flex flex-col gap-3 p-3 sm:p-4">
@@ -136,8 +206,21 @@ export function TextInputPanel() {
               Describe your architecture
             </h2>
           </div>
-          <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
-            <span>{wordCount} words · {charCount} chars</span>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+              <span>{wordCount} words · {charCount} chars</span>
+            </div>
+            {graph && graph.nodes.length > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 w-7 p-0"
+                onClick={() => setExpanded(false)}
+                title="Collapse"
+              >
+                <ChevronUp className="h-3.5 w-3.5" />
+              </Button>
+            )}
           </div>
         </div>
 
@@ -150,7 +233,7 @@ export function TextInputPanel() {
             onFocus={() => setTaFocused(true)}
             onBlur={() => setTimeout(() => setTaFocused(false), 150)}
             placeholder="e.g. React frontend on Vercel, Node.js API on Lambda, PostgreSQL on RDS, Redis cache, S3 storage, CloudFront CDN..."
-            className="min-h-[110px] resize-y pr-28 font-mono text-sm leading-relaxed"
+            className="min-h-[88px] resize-y pr-28 font-mono text-sm leading-relaxed"
             onKeyDown={(e) => {
               if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
                 e.preventDefault();
@@ -240,9 +323,7 @@ export function TextInputPanel() {
               key={i}
               variant="ghost"
               size="sm"
-              className={cn(
-                "h-7 text-[11px] px-2 max-w-full text-muted-foreground hover:text-foreground",
-              )}
+              className={cn("h-7 text-[11px] px-2 text-muted-foreground hover:text-foreground")}
               onClick={() => setDescription(ex)}
             >
               <FileText className="h-3 w-3 mr-1 shrink-0" />

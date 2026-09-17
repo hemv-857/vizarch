@@ -61,9 +61,9 @@ export function buildSvg(
 
   const bg = theme === "dark" ? "#0b1220" : "#ffffff";
   const fg = theme === "dark" ? "#e2e8f0" : "#0f172a";
-  const subFg = theme === "dark" ? "#94a3b8" : "#64748b";
+  const subFg = theme === "dark" ? "#94a3b8" : "#475569";
   const cardBg = theme === "dark" ? "#0f172a" : "#ffffff";
-  const cardStroke = theme === "dark" ? "#1e293b" : "#e2e8f0";
+  const cardStroke = theme === "dark" ? "#1e293b" : "#cbd5e1";
 
   const nodeMap = new Map<string, ArchNode>(graph.nodes.map((n) => [n.id, n]));
 
@@ -98,9 +98,14 @@ export function buildSvg(
                 : "");
     const proto = (e.protocol ?? "direct").toLowerCase();
     const color =
-      PROTOCOL_COLORS[proto] ?? (theme === "dark" ? "#64748b" : "#94a3b8");
+      PROTOCOL_COLORS[proto] ?? (theme === "dark" ? "#94a3b8" : "#64748b");
+    // Wrap each edge in a <g class="edge" data-id="..."> so canvas can detect clicks.
+    // We render an invisible thick "hit" path on top for easier clicking.
     edgePaths.push(
-      `<path d="M${x1},${y1} C${c1x},${c1y} ${c2x},${c2y} ${x2},${y2}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-dasharray="${dashArray}" />`,
+      `<g class="edge" data-id="${escapeXml(e.id)}" data-protocol="${escapeXml(proto)}" style="cursor:pointer">` +
+      `<path d="M${x1},${y1} C${c1x},${c1y} ${c2x},${c2y} ${x2},${y2}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-dasharray="${dashArray}" />` +
+      `<path d="M${x1},${y1} C${c1x},${c1y} ${c2x},${c2y} ${x2},${y2}" fill="none" stroke="transparent" stroke-width="14" stroke-linecap="round" pointer-events="stroke" />` +
+      `</g>`,
     );
     // Arrowhead
     const angle = Math.atan2(y2 - c2y, x2 - c2x);
@@ -110,13 +115,13 @@ export function buildSvg(
     const bx = x2 - arrowSize * Math.cos(angle + Math.PI / 7);
     const by = y2 - arrowSize * Math.sin(angle + Math.PI / 7);
     edgePaths.push(
-      `<path d="M${x2},${y2} L${ax},${ay} L${bx},${by} Z" fill="${color}" />`,
+      `<path d="M${x2},${y2} L${ax},${ay} L${bx},${by} Z" fill="${color}" pointer-events="none" />`,
     );
     if (showEdgeLabels && e.label) {
       const midX = (x1 + x2) / 2;
       const midY = (y1 + y2) / 2;
       edgeLabels.push(
-        `<g><rect x="${midX - 28}" y="${midY - 9}" width="56" height="18" rx="9" fill="${bg}" stroke="${cardStroke}" /><text x="${midX}" y="${midY + 4}" font-family="ui-sans-serif, system-ui, sans-serif" font-size="10" fill="${subFg}" text-anchor="middle">${escapeXml(e.label)}</text></g>`,
+        `<g pointer-events="none"><rect x="${midX - 30}" y="${midY - 9}" width="60" height="18" rx="9" fill="${bg}" stroke="${color}" stroke-width="1" stroke-opacity="0.4" /><text x="${midX}" y="${midY + 4}" font-family="ui-sans-serif, system-ui, sans-serif" font-size="10" fill="${color}" text-anchor="middle" font-weight="500">${escapeXml(e.label)}</text></g>`,
       );
     }
   }
@@ -125,21 +130,19 @@ export function buildSvg(
   for (const n of graph.nodes) {
     if (n.hidden) continue;
     const color = nodeColor(n, graph.style);
-    const isDark = theme === "dark";
-    // Card background with subtle accent stripe
+    // Card background with subtle accent stripe + soft drop shadow
     nodeGroups.push(
-      `<g class="node" data-id="${escapeXml(n.id)}" data-service="${escapeXml(n.serviceId)}" transform="translate(${n.x},${n.y})">
+      `<g class="node" data-id="${escapeXml(n.id)}" data-service="${escapeXml(n.serviceId)}" transform="translate(${n.x},${n.y})" style="cursor:pointer">
   <rect width="${NODE_W}" height="${NODE_H}" rx="12" ry="12" fill="${cardBg}" stroke="${cardStroke}" stroke-width="1.5" />
   <rect width="6" height="${NODE_H}" rx="3" ry="3" fill="${color}" />
   <g transform="translate(${NODE_W / 2 - iconSize / 2}, 14)">
     <rect width="${iconSize}" height="${iconSize}" rx="${iconSize / 4}" fill="${color}22" />
-    <path d="${n.iconPath}" fill="none" stroke="${color}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" transform="scale(${iconSize / 24})" />
+    <path d="${n.iconPath}" fill="none" stroke="${color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" transform="scale(${iconSize / 24})" />
   </g>
-  ${showLabels ? `<text x="${NODE_W / 2}" y="${NODE_H - 22}" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12" font-weight="600" fill="${fg}" text-anchor="middle">${escapeXml(n.label)}</text>` : ""}
-  <text x="${NODE_W / 2}" y="${NODE_H - 8}" font-family="ui-sans-serif, system-ui, sans-serif" font-size="9" fill="${subFg}" text-anchor="middle">${escapeXml(n.provider)}/${escapeXml(n.type)}</text>
+  ${showLabels ? `<text x="${NODE_W / 2}" y="${NODE_H - 22}" font-family="ui-sans-serif, system-ui, sans-serif" font-size="13" font-weight="600" fill="${fg}" text-anchor="middle">${escapeXml(n.label)}</text>` : ""}
+  <text x="${NODE_W / 2}" y="${NODE_H - 8}" font-family="ui-sans-serif, system-ui, sans-serif" font-size="10" fill="${subFg}" text-anchor="middle" font-weight="500">${escapeXml(n.provider)}/${escapeXml(n.type)}</text>
 </g>`,
     );
-    void isDark;
   }
 
   const defs = `<defs>

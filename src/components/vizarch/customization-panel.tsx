@@ -1,7 +1,6 @@
 "use client";
 
 import { useDiagramStore } from "@/hooks/use-diagram-store";
-import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import {
@@ -12,7 +11,23 @@ import {
 } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Palette, Layout, Tag, Shapes, Trash2, Sun, Moon, RotateCcw } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  Palette,
+  Layout,
+  Tag,
+  Shapes,
+  Sun,
+  Moon,
+  RotateCcw,
+  Undo2,
+  Redo2,
+} from "lucide-react";
 import type { ArchStyle } from "@/lib/vizarch/types";
 import { DEFAULT_STYLE } from "@/lib/vizarch/types";
 
@@ -45,6 +60,14 @@ export function CustomizationPanel() {
   const style = useDiagramStore((s) => s.style);
   const setStyle = useDiagramStore((s) => s.setStyle);
   const graph = useDiagramStore((s) => s.graph);
+  const darkMode = useDiagramStore((s) => s.darkMode);
+  const toggleDarkMode = useDiagramStore((s) => s.toggleDarkMode);
+  const undo = useDiagramStore((s) => s.undo);
+  const redo = useDiagramStore((s) => s.redo);
+  const historyIdx = useDiagramStore((s) => s.historyIdx);
+  const historyLen = useDiagramStore((s) => s.history.length);
+  const canUndo = historyIdx > 0;
+  const canRedo = historyIdx < historyLen - 1;
 
   return (
     <Card className="rounded-xl shadow-sm">
@@ -54,15 +77,68 @@ export function CustomizationPanel() {
             <Shapes className="h-4 w-4 text-teal-600" />
             Customization
           </CardTitle>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 px-2 text-xs"
-            onClick={() => setStyle(DEFAULT_STYLE)}
-            title="Reset to defaults"
-          >
-            <RotateCcw className="h-3 w-3 mr-1" />Reset
-          </Button>
+          <div className="flex items-center gap-0.5">
+            <TooltipProvider delayDuration={300}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 w-7 p-0"
+                    onClick={undo}
+                    disabled={!canUndo}
+                    title="Undo (Cmd+Z)"
+                  >
+                    <Undo2 className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Undo (⌘Z)</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 w-7 p-0"
+                    onClick={redo}
+                    disabled={!canRedo}
+                    title="Redo (Cmd+Shift+Z)"
+                  >
+                    <Redo2 className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Redo (⌘⇧Z)</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 w-7 p-0"
+                    onClick={toggleDarkMode}
+                    title="Toggle theme"
+                  >
+                    {darkMode ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Toggle {darkMode ? "light" : "dark"} mode</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    onClick={() => setStyle(DEFAULT_STYLE)}
+                    title="Reset to defaults"
+                  >
+                    <RotateCcw className="h-3 w-3 mr-1" />Reset
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Reset to defaults</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="px-4 pb-4">
@@ -118,15 +194,15 @@ export function CustomizationPanel() {
 
             <div className="flex items-center justify-between rounded-md border border-border p-2">
               <div className="flex items-center gap-2">
-                {style.theme === "dark" ? <Moon className="h-3.5 w-3.5" /> : <Sun className="h-3.5 w-3.5" />}
+                {darkMode ? <Moon className="h-3.5 w-3.5" /> : <Sun className="h-3.5 w-3.5" />}
                 <div>
                   <div className="text-[12px] font-medium">Theme</div>
-                  <div className="text-[10px] text-muted-foreground capitalize">{style.theme}</div>
+                  <div className="text-[10px] text-muted-foreground capitalize">{darkMode ? "dark" : "light"}</div>
                 </div>
               </div>
               <Switch
-                checked={style.theme === "dark"}
-                onCheckedChange={(v) => setStyle({ theme: v ? "dark" : "light" })}
+                checked={darkMode}
+                onCheckedChange={(v) => useDiagramStore.getState().setDarkMode(v)}
               />
             </div>
           </TabsContent>

@@ -13,8 +13,11 @@ import { DiagramCanvas } from "@/components/vizarch/diagram-canvas";
 import { CustomizationPanel } from "@/components/vizarch/customization-panel";
 import { ExportPanel } from "@/components/vizarch/export-panel";
 import { NodeDetailPanel } from "@/components/vizarch/node-detail-panel";
+import { EdgeDetailPanel } from "@/components/vizarch/edge-detail-panel";
 import { VizarchFooter } from "@/components/vizarch/footer";
 import { ServicesCatalogDialog } from "@/components/vizarch/services-catalog-dialog";
+import { ShortcutsHelpDialog } from "@/components/vizarch/shortcuts-help-dialog";
+import { RecentDiagramsDialog } from "@/components/vizarch/recent-diagrams-dialog";
 import { MetaStats } from "@/components/vizarch/meta-stats";
 import { Toaster } from "sonner";
 
@@ -24,57 +27,91 @@ const DEFAULT_DESCRIPTION =
 export default function Home() {
   const store = useDiagramStore();
   const didInit = useRef(false);
+  const selectedEdgeId = useDiagramStore((s) => s.selectedEdgeId);
+  const selectedNodeId = useDiagramStore((s) => s.selectedNodeId);
 
-  // On first mount, kick off an initial generation so the page is never empty.
+  // On first mount: load from localStorage OR kick off initial generation.
   useEffect(() => {
     if (didInit.current) return;
     didInit.current = true;
-    void generateInitial(store);
-    // store is a stable Zustand singleton; effect should only run once.
+    void initApp(store);
+    // store is a stable Zustand singleton; effect runs only once.
   }, [store]);
 
+  // Global keyboard shortcuts (help, undo/redo handled here so they work anywhere)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      const isEditable =
+        tag === "TEXTAREA" || tag === "INPUT" || (e.target as HTMLElement)?.isContentEditable;
+      // ? opens help (Shift+/)
+      if (e.shiftKey && e.key === "?") {
+        e.preventDefault();
+        useDiagramStore.getState().toggleShortcutsHelp();
+        return;
+      }
+      if (isEditable) return;
+      // Undo/redo
+      if ((e.metaKey || e.ctrlKey) && (e.key === "z" || e.key === "Z")) {
+        e.preventDefault();
+        if (e.shiftKey) useDiagramStore.getState().redo();
+        else useDiagramStore.getState().undo();
+      } else if ((e.metaKey || e.ctrlKey) && (e.key === "y" || e.key === "Y")) {
+        e.preventDefault();
+        useDiagramStore.getState().redo();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-b from-background to-muted/30 text-foreground">
+    <div className="h-screen flex flex-col bg-gradient-to-b from-background to-muted/30 text-foreground overflow-hidden">
       <VizarchHeader />
-      <main className="flex-1 flex flex-col gap-3 px-3 sm:px-4 lg:px-6 pb-4">
+      <main className="flex-1 flex flex-col gap-3 px-3 sm:px-4 lg:px-6 py-3 min-h-0 overflow-y-auto">
         {/* Top: input panel */}
-        <section
-          aria-label="Architecture description input"
-          className="w-full"
-        >
+        <section aria-label="Architecture description input" className="w-full shrink-0">
           <TextInputPanel />
         </section>
 
         {/* Middle: meta stats + toolbar */}
         {store.meta && (
-          <section aria-label="Diagram metadata">
+          <section aria-label="Diagram metadata" className="shrink-0">
             <MetaStats />
           </section>
         )}
 
-        {/* Lower: canvas + side panels */}
+        {/* Lower: canvas + side panels (fills remaining height) */}
         <section
           aria-label="Diagram editor"
-          className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-3 flex-1 min-h-[480px]"
+          className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-3 flex-1 min-h-[360px] min-h-0"
         >
-          <div className="min-h-[440px] lg:min-h-[520px] h-full order-1">
+          <div className="h-full min-h-[320px] order-1">
             <DiagramCanvas />
           </div>
-          <div className="order-2 flex flex-col gap-3">
-            {store.selectedNodeId ? <NodeDetailPanel /> : <CustomizationPanel />}
+          <div className="order-2 flex flex-col gap-3 min-h-0 overflow-y-auto max-h-[calc(100vh-180px)]">
+            {selectedEdgeId ? (
+              <EdgeDetailPanel />
+            ) : selectedNodeId ? (
+              <NodeDetailPanel />
+            ) : (
+              <CustomizationPanel />
+            )}
             {store.showExport && <ExportPanel />}
           </div>
         </section>
       </main>
       <VizarchFooter />
       <ServicesCatalogDialog />
+      <ShortcutsHelpDialog />
+      <RecentDiagramsDialog />
       <Toaster richColors position="bottom-right" />
     </div>
   );
 }
 
-async function generateInitial(store: ReturnType<typeof useDiagramStore>) {
-  // If a share slug is in the URL, load the saved diagram instead.
+async function initApp(store: ReturnType<typeof useDiagramStore>) {
+  // 1) If a share slug is in the URL, load the saved diagram instead.
   const url = new URL(window.location.href);
   const shareSlug = url.searchParams.get("share");
   if (shareSlug) {
@@ -98,7 +135,6 @@ async function generateInitial(store: ReturnType<typeof useDiagramStore>) {
         store.setStyle(style);
         store.setDescription(diagram.description ?? "");
         store.setShare(shareSlug, window.location.href);
-        // Re-render to compute width/height client-side
         store.rerender();
         return;
       }
@@ -107,7 +143,23 @@ async function generateInitial(store: ReturnType<typeof useDiagramStore>) {
     }
   }
 
-  // Default: kick off an LLM parse with the default description.
+  // 2) Try to restore from localStorage (auto-save).
+  try {
+    const raw = window.localStorage.getItem("vizarch:autosave:v2");
+    if (raw) {
+      const persisted = JSON.parse(raw);
+      if (persisted?.graph?.nodes?.length > 0) {
+        store.loadFromStorage();
+        // Still ensure dark mode class is applied
+        if (persisted.darkMode) document.documentElement.classList.add("dark");
+        return;
+      }
+    }
+  } catch {
+    // ignore parse errors
+  }
+
+  // 3) Default: kick off an LLM parse with the default description.
   store.setDescription(DEFAULT_DESCRIPTION);
   try {
     const res = await fetch("/api/v1/generate", {
@@ -131,7 +183,7 @@ async function generateInitial(store: ReturnType<typeof useDiagramStore>) {
         if (!meta) return null;
         return { id: n.id, service: meta, label: n.label };
       })
-      .filter(Boolean) as any;
+      .filter(Boolean) as { id: string; service: NonNullable<ReturnType<typeof resolveServiceByName>>; label?: string }[];
     const graph = buildGraphFromServices(services, tpl.edges);
     graph.style = { ...DEFAULT_STYLE, layout: "horizontal", theme: "light" };
     layoutGraph(graph, { orientation: "horizontal" });

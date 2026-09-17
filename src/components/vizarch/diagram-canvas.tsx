@@ -99,18 +99,28 @@ export function DiagramCanvas() {
     return () => window.removeEventListener("mouseup", onUp);
   }, []);
 
-  // Click on SVG nodes via event delegation
+  // Click on SVG nodes / edges via event delegation
   const onSvgClick = (e: React.MouseEvent) => {
     const target = e.target as Element;
-    const g = target.closest("g.node") as SVGGraphicsElement | null;
-    if (g) {
-      const id = g.getAttribute("data-id");
+    const nodeG = target.closest("g.node") as SVGGraphicsElement | null;
+    if (nodeG) {
+      const id = nodeG.getAttribute("data-id");
       if (id) {
         setSelectedNode(selectedNodeId === id ? null : id);
         return;
       }
     }
+    const edgeG = target.closest("g.edge") as SVGGraphicsElement | null;
+    if (edgeG) {
+      const id = edgeG.getAttribute("data-id");
+      if (id) {
+        const store = useDiagramStore.getState();
+        store.setSelectedEdge(store.selectedEdgeId === id ? null : id);
+        return;
+      }
+    }
     setSelectedNode(null);
+    useDiagramStore.getState().setSelectedEdge(null);
   };
 
   const onSvgMouseMove = (e: React.MouseEvent) => {
@@ -120,13 +130,15 @@ export function DiagramCanvas() {
     setHoveredNode(id);
   };
 
-  // Keyboard shortcuts
+  // Keyboard shortcuts (canvas-scoped; undo/redo handled in page.tsx)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === "TEXTAREA" || tag === "INPUT") return;
-      if (e.key === "Escape") setSelectedNode(null);
-      else if (e.key === "+" || e.key === "=") {
+      if (e.key === "Escape") {
+        setSelectedNode(null);
+        useDiagramStore.getState().setSelectedEdge(null);
+      } else if (e.key === "+" || e.key === "=") {
         setZoom(zoom * 1.15);
         setAutoFit(false);
       } else if (e.key === "-" || e.key === "_") {
@@ -139,8 +151,12 @@ export function DiagramCanvas() {
         e.preventDefault();
         if (selectedNodeId) useDiagramStore.getState().duplicateNode(selectedNodeId);
       } else if (e.key === "Backspace" || e.key === "Delete") {
+        const store = useDiagramStore.getState();
         if (selectedNodeId) {
-          useDiagramStore.getState().deleteNode(selectedNodeId);
+          store.deleteNode(selectedNodeId);
+          toast_deleted();
+        } else if (store.selectedEdgeId) {
+          store.deleteEdge(store.selectedEdgeId);
           toast_deleted();
         }
       }
@@ -153,7 +169,7 @@ export function DiagramCanvas() {
   const isLoading = status === "loading" && !svg;
 
   return (
-    <div className="relative h-full min-h-[460px] lg:min-h-[560px] rounded-xl border border-border/60 bg-card shadow-sm overflow-hidden">
+    <div className="relative h-full min-h-[320px] rounded-xl border border-border/60 bg-card shadow-sm overflow-hidden">
       {/* Toolbar */}
       <div className="absolute top-2 right-2 z-10 flex items-center gap-1 rounded-lg border border-border bg-background/90 backdrop-blur px-1 py-1 shadow-sm">
         <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => { setZoom(zoom * 1.2); setAutoFit(false); }} title="Zoom in">
