@@ -14,6 +14,7 @@ import {
   X,
   Link2,
   ArrowRight,
+  Crosshair,
 } from "lucide-react";
 import { getProviderLabel, getTypeLabel, TYPE_COLORS } from "@/lib/vizarch/services";
 import { NodeAnnotations } from "@/components/vizarch/node-annotations";
@@ -35,6 +36,7 @@ export function NodeDetailPanel() {
   const setSelectedNode = useDiagramStore((s) => s.setSelectedNode);
   const setConnectMode = useDiagramStore((s) => s.setConnectMode);
   const connectModeFromId = useDiagramStore((s) => s.connectModeFromId);
+  const fitToNode = useDiagramStore((s) => s.fitToNode);
 
   // Local state for the label input, synced with the store node but debounced on save
   // The parent passes a `key` prop = selectedId so this component remounts when selection changes,
@@ -173,6 +175,17 @@ export function NodeDetailPanel() {
             </div>
           </div>
         </div>
+
+        {/* Quick actions: zoom to node */}
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full h-7 text-[11px]"
+          onClick={() => fitToNode(node.id)}
+          title="Zoom to this node"
+        >
+          <Crosshair className="h-3 w-3 mr-1.5" />Zoom to node
+        </Button>
 
         {/* Connect to another node */}
         {connectModeFromId === node.id ? (

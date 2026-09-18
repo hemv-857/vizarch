@@ -1107,3 +1107,77 @@ Task: Import JSON, keyboard shortcuts, right-click context menu, shortcuts updat
 5. **Rate limiting persistence** — use database or Redis for rate limit counters
 6. **GitHub Action / Slack bot** — integrations for CI/CD diagram generation
 7. **Performance: SVG memoization** — for 100+ node diagrams, memoize by graph hash
+
+---
+Task ID: 12
+Agent: main (cron webDevReview)
+Task: Onboarding overlay, zoom-to-node, autoFit store fix, dark mode transitions, scrollbar styling
+
+## Current Project Status Assessment
+- vizarch is production-ready from Task 11 (import JSON, keyboard shortcuts, context menu)
+- ESLint: 0 errors, 0 warnings
+- All API routes returning 200
+- Collab service running on port 3003
+- VLM rating: 9/10
+
+## Completed Modifications
+
+### New Features (3)
+
+1. **Onboarding welcome overlay** (`onboarding-overlay.tsx`)
+   - Shows on first visit (controlled by localStorage flag `vizarch:onboarded`)
+   - Appears 1.5s after page load (after initial diagram renders)
+   - Features: vizarch logo, tagline, 6 feature highlights (AI parsing, 188+ icons, export, share, shortcuts, templates)
+   - "Try an example" button: loads the default description and dismisses
+   - "Got it" button: just dismisses
+   - Backdrop blur + animated entrance (fade-in + zoom-in)
+   - Never shows again after dismissal (localStorage flag set)
+   - Verified: overlay appears on fresh visit, dismissed on click
+
+2. **Zoom-to-node feature** (`use-diagram-store.ts` + `node-detail-panel.tsx`)
+   - New `fitToNode(nodeId)` store action: calculates pan to center the node, sets zoom to 1.5x
+   - "Zoom to node" button (Crosshair icon) in NodeDetailPanel
+   - Click → canvas zooms to the selected node for close-up view
+   - Disables autoFit so the zoom persists (not overridden by ResizeObserver)
+   - Verified: zoom changed from 0.39 to 1.5 when clicking "Zoom to node"
+
+3. **Dark mode smooth transitions + scrollbar styling** (`globals.css`)
+   - Added `transition: background-color 0.2s ease, color 0.2s ease` on body for smooth theme switching
+   - Custom scrollbar: 8px width, border radius, hover effect (changes from border to muted-foreground color)
+   - Focus-visible: 2px solid ring with offset for better keyboard accessibility
+
+### Bug Fixes
+1. **Fixed autoFit overriding fitToNode** — The canvas's autoFit was a local useState that wasn't synced with the store. When fitToNode set zoom/pan via the store, the canvas's ResizeObserver autoFit effect immediately reset them because autoFit was still true. Fixed by:
+   - Moving `autoFit` from local useState to store state (`autoFit: boolean` in DiagramState)
+   - Added `setAutoFit(v)` store action
+   - All canvas autoFit calls now use `storeSetAutoFit()` (renamed from `setAutoFit()`)
+   - `fitToNode()` sets `autoFit: false` so the zoom persists
+   - `resetView()` and `fitToScreen()` set `autoFit: true` to re-enable auto-fitting
+
+## Verification Results
+- ESLint: 0 errors, 0 warnings
+- Dev server: all routes 200
+- Agent Browser QA confirmed:
+  - Onboarding overlay appears on first visit ✓
+  - Onboarding dismissed on "Got it" click ✓
+  - "Zoom to node" button visible in node detail panel ✓
+  - Clicking "Zoom to node" changes zoom from 0.39 to 1.5 ✓
+  - Pressing "F" fits all nodes back to view ✓
+  - All 12 nodes visible after fitting ✓
+  - No errors ✓
+- VLM final rating: 9/10 ("Clean layout, clear hierarchy, accurate representation")
+
+## Unresolved Issues / Risks
+- **Collab service not auto-started**: The mini-service needs manual start.
+- **No auth/tiers yet**: All users are "free" tier.
+- **Mobile layout**: Touch gestures not optimized.
+- **Rate limiting is in-memory only**: Server restart resets counters.
+
+## Priority Recommendations for Next Phase
+1. **Auto-start collab service** — integrate with dev server startup
+2. **Auth + user accounts** — NextAuth.js for Pro/Enterprise tier enforcement
+3. **Mobile responsive** — pinch-to-zoom on canvas, touch-friendly node selection
+4. **Visual regression tests** — golden file comparison for SVG output
+5. **Rate limiting persistence** — use database or Redis for rate limit counters
+6. **GitHub Action / Slack bot** — integrations for CI/CD diagram generation
+7. **Performance: SVG memoization** — for 100+ node diagrams, memoize by graph hash

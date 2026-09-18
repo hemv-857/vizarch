@@ -46,8 +46,9 @@ export function DiagramCanvas() {
   const wrapRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0, panX: 0, panY: 0 });
-  const [autoFit, setAutoFit] = useState(true);
   const [wrapSize, setWrapSizeLocal] = useState({ w: 0, h: 0 });
+  const autoFit = useDiagramStore((s) => s.autoFit);
+  const storeSetAutoFit = useDiagramStore((s) => s.setAutoFit);
   // Node drag state (for repositioning nodes by dragging)
   const [nodeDragId, setNodeDragId] = useState<string | null>(null);
   const [nodeDragStart, setNodeDragStart] = useState({ x: 0, y: 0, nodeX: 0, nodeY: 0 });
@@ -90,7 +91,7 @@ export function DiagramCanvas() {
       e.preventDefault();
       const factor = e.deltaY < 0 ? 1.1 : 0.9;
       setZoom(zoom * factor);
-      setAutoFit(false);
+      storeSetAutoFit(false);
     },
     [zoom, setZoom],
   );
@@ -106,13 +107,13 @@ export function DiagramCanvas() {
       if (id && node) {
         setNodeDragId(id);
         setNodeDragStart({ x: e.clientX, y: e.clientY, nodeX: node.x, nodeY: node.y });
-        setAutoFit(false);
+        storeSetAutoFit(false);
         e.stopPropagation();
         return;
       }
     }
     setDragging(true);
-    setAutoFit(false);
+    storeSetAutoFit(false);
     setDragStart({ x: e.clientX, y: e.clientY, panX, panY });
   };
 
@@ -218,13 +219,13 @@ export function DiagramCanvas() {
         useDiagramStore.getState().setConnectMode(null);
       } else if (e.key === "+" || e.key === "=") {
         setZoom(zoom * 1.15);
-        setAutoFit(false);
+        storeSetAutoFit(false);
       } else if (e.key === "-" || e.key === "_") {
         setZoom(zoom * 0.85);
-        setAutoFit(false);
+        storeSetAutoFit(false);
       } else if (e.key === "0" || e.key === "f" || e.key === "F") {
         resetView();
-        setAutoFit(true);
+        storeSetAutoFit(true);
       } else if ((e.metaKey || e.ctrlKey) && (e.key === "d" || e.key === "D")) {
         e.preventDefault();
         if (selectedNodeId) useDiagramStore.getState().duplicateNode(selectedNodeId);
@@ -250,13 +251,13 @@ export function DiagramCanvas() {
     <div className="relative h-full min-h-[320px] rounded-xl border border-border/60 bg-card shadow-sm overflow-hidden">
       {/* Toolbar */}
       <div className="absolute top-2 right-2 z-10 flex items-center gap-1 rounded-lg border border-border bg-background/90 backdrop-blur px-1 py-1 shadow-sm">
-        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => { setZoom(zoom * 1.2); setAutoFit(false); }} title="Zoom in (+)">
+        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => { setZoom(zoom * 1.2); storeSetAutoFit(false); }} title="Zoom in (+)">
           <ZoomIn className="h-3.5 w-3.5" />
         </Button>
-        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => { setZoom(zoom * 0.8); setAutoFit(false); }} title="Zoom out (−)">
+        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => { setZoom(zoom * 0.8); storeSetAutoFit(false); }} title="Zoom out (−)">
           <ZoomOut className="h-3.5 w-3.5" />
         </Button>
-        <Button variant="ghost" size="sm" className="h-7 px-2 text-[11px]" onClick={() => { resetView(); setAutoFit(true); }} title="Fit to screen (F)">
+        <Button variant="ghost" size="sm" className="h-7 px-2 text-[11px]" onClick={() => { resetView(); storeSetAutoFit(true); }} title="Fit to screen (F)">
           <Maximize className="h-3.5 w-3.5 mr-1" />Fit
         </Button>
         <div className="px-1.5 text-[11px] text-muted-foreground tabular-nums border-l border-border ml-0.5">
@@ -270,7 +271,7 @@ export function DiagramCanvas() {
             useDiagramStore.getState().pushHistory();
             useDiagramStore.getState().rerender();
             resetView();
-            setAutoFit(true);
+            storeSetAutoFit(true);
           }}
           title="Auto-layout (re-run layout engine)"
         >

@@ -65,6 +65,7 @@ interface DiagramState {
   // Real canvas wrap dimensions (for accurate mini-map viewport)
   wrapW: number;
   wrapH: number;
+  autoFit: boolean;  // when true, canvas auto-fits on resize/diagram change
   showCustomization: boolean;
   showExport: boolean;
   showServicesCatalog: boolean;
@@ -101,8 +102,10 @@ interface DiagramState {
   setZoom: (z: number) => void;
   setPan: (x: number, y: number) => void;
   setWrapSize: (w: number, h: number) => void;
+  setAutoFit: (v: boolean) => void;
   resetView: () => void;
   fitToScreen: () => void;
+  fitToNode: (nodeId: string) => void;
   toggleCustomization: () => void;
   toggleExport: () => void;
   toggleServicesCatalog: () => void;
@@ -272,6 +275,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   panY: 0,
   wrapW: 0,
   wrapH: 0,
+  autoFit: true,
   showCustomization: true,
   showExport: false,
   showServicesCatalog: false,
@@ -362,8 +366,27 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   setZoom: (z) => set({ zoom: Math.max(0.1, Math.min(5, z)) }),
   setPan: (x, y) => set({ panX: x, panY: y }),
   setWrapSize: (w, h) => set({ wrapW: w, wrapH: h }),
-  resetView: () => set({ zoom: 1, panX: 0, panY: 0 }),
-  fitToScreen: () => set({ zoom: 1, panX: 0, panY: 0 }), // canvas component handles actual fit via ResizeObserver autoFit
+  setAutoFit: (v) => set({ autoFit: v }),
+  resetView: () => set({ zoom: 1, panX: 0, panY: 0, autoFit: true }),
+  fitToScreen: () => set({ zoom: 1, panX: 0, panY: 0, autoFit: true }),
+  fitToNode: (nodeId) => {
+    const graph = get().graph;
+    if (!graph) return;
+    const node = graph.nodes.find((n) => n.id === nodeId);
+    if (!node) return;
+    const targetZoom = 1.5;
+    const nodeCenterX = node.x + 80;
+    const nodeCenterY = node.y + 44;
+    const svgW = get().svgWidth;
+    const svgH = get().svgHeight;
+    if (!svgW || !svgH) return;
+    set({
+      zoom: targetZoom,
+      panX: (svgW / 2 - nodeCenterX) * targetZoom,
+      panY: (svgH / 2 - nodeCenterY) * targetZoom,
+      autoFit: false, // disable autoFit so the zoom-to-node persists
+    });
+  },
   toggleCustomization: () => set({ showCustomization: !get().showCustomization }),
   toggleExport: () => set({ showExport: !get().showExport }),
   toggleServicesCatalog: () => set({ showServicesCatalog: !get().showServicesCatalog }),

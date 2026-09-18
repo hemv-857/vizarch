@@ -21,6 +21,7 @@ import { ShortcutsHelpDialog } from "@/components/vizarch/shortcuts-help-dialog"
 import { RecentDiagramsDialog } from "@/components/vizarch/recent-diagrams-dialog";
 import { VersionHistoryDialog } from "@/components/vizarch/version-history-dialog";
 import { ImportJsonDialog } from "@/components/vizarch/import-json-dialog";
+import { OnboardingOverlay } from "@/components/vizarch/onboarding-overlay";
 import { DiagramStatsPanel } from "@/components/vizarch/diagram-stats-panel";
 import { MetaStats } from "@/components/vizarch/meta-stats";
 import { Button } from "@/components/ui/button";
@@ -167,6 +168,7 @@ export default function Home() {
       <RecentDiagramsDialog />
       <VersionHistoryDialog />
       <ImportJsonDialog />
+      <OnboardingOverlay />
       <Toaster richColors position="bottom-right" />
     </div>
   );
