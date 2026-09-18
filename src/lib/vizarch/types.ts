@@ -60,7 +60,7 @@ export const DEFAULT_STYLE: ArchStyle = {
   showLabels: true,
   showEdgeLabels: true,
   edgeStyle: "solid",
-  theme: "light",
+  theme: "dark",
 };
 
 export interface DiagramResult {

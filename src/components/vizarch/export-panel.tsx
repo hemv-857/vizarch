@@ -22,6 +22,7 @@ import {
 import {
   exportJson,
   exportMarkdown,
+  exportMermaid,
   downloadSvg,
   downloadText,
   exportPngBrowser,
@@ -32,6 +33,7 @@ import { toast } from "sonner";
 const FORMATS = [
   { id: "png", name: "PNG", icon: FileImage, hint: "Raster · 2x resolution", mime: "image/png" },
   { id: "svg", name: "SVG", icon: FileCode, hint: "Vector · scalable", mime: "image/svg+xml" },
+  { id: "mermaid", name: "Mermaid", icon: FileCode, hint: "Mermaid syntax", mime: "text/plain" },
   { id: "pdf", name: "PDF", icon: FileText, hint: "Print-ready", mime: "application/pdf" },
   { id: "json", name: "JSON", icon: FileJson, hint: "Programmatic use", mime: "application/json" },
   { id: "md", name: "Markdown", icon: FileText, hint: "GitHub README", mime: "text/markdown" },
@@ -68,6 +70,9 @@ export function ExportPanel() {
       } else if (format === "json") {
         downloadText(exportJson(graph), `${fileBase}.json`, "application/json");
         toast.success("JSON downloaded");
+      } else if (format === "mermaid") {
+        downloadText(exportMermaid(graph), `${fileBase}.mmd`, "text/plain");
+        toast.success("Mermaid downloaded");
       } else if (format === "md") {
         downloadText(exportMarkdown(graph), `${fileBase}.md`, "text/markdown");
         toast.success("Markdown downloaded");
@@ -158,7 +163,7 @@ export function ExportPanel() {
         </CardTitle>
       </CardHeader>
       <CardContent className="px-4 pb-4 space-y-3">
-        <div className="grid grid-cols-5 gap-1.5">
+        <div className="grid grid-cols-6 gap-1.5">
           {FORMATS.map((f) => (
             <button
               key={f.id}
@@ -213,6 +218,18 @@ export function ExportPanel() {
             }}
           >
             <Copy className="h-3 w-3 mr-1" />Copy MD
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 flex-1 text-[11px]"
+            onClick={() => {
+              if (!graph) return;
+              navigator.clipboard.writeText(exportMermaid(graph));
+              toast.success("Mermaid copied to clipboard");
+            }}
+          >
+            <Copy className="h-3 w-3 mr-1" />Mermaid
           </Button>
         </div>
 

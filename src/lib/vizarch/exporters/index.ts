@@ -175,3 +175,61 @@ export function downloadText(text: string, filename: string, mime = "text/plain"
   const blob = new Blob([text], { type: `${mime};charset=utf-8` });
   triggerDownload(blob, filename);
 }
+
+// Mermaid diagram export
+export function exportMermaid(graph: ArchGraph): string {
+  const lines: string[] = ["graph LR"];
+
+  // Sanitize node labels for Mermaid
+  function sanitize(s: string): string {
+    return s.replace(/[^a-zA-Z0-9 _\-\/]/g, " ").trim().replace(/\s+/g, " ");
+  }
+
+  // Node shape mapping based on service type
+  function nodeShape(n: ArchGraph["nodes"][0]): { prefix: string; suffix: string } {
+    switch (n.type) {
+      case "frontend":
+      case "client":
+        return { prefix: "[", suffix: "]" };        // rectangle
+      case "database":
+      case "cache":
+        return { prefix: "((", suffix: "))" };       // cylinder
+      case "queue":
+        return { prefix: "{{", suffix: "}}" };       // hexagon
+      case "cdn":
+      case "networking":
+        return { prefix: "{", suffix: "}" };         // rhombus
+      case "monitoring":
+      case "analytics":
+        return { prefix: ">]", suffix: "]" };        // asymmetric
+      case "security":
+        return { prefix: "[/", suffix: "/]" };       // parallelogram
+      default:
+        return { prefix: "[", suffix: "]" };         // rectangle
+    }
+  }
+
+  const nodeIdMap = new Map<string, string>();
+
+  for (const n of graph.nodes) {
+    if (n.hidden) continue;
+    const shortId = `n${nodeIdMap.size + 1}`;
+    nodeIdMap.set(n.id, shortId);
+    const shape = nodeShape(n);
+    lines.push(`  ${shortId}${shape.prefix}"${sanitize(n.label)} (${sanitize(n.serviceName)})"${shape.suffix}`);
+  }
+
+  lines.push("");
+
+  for (const e of graph.edges) {
+    if (e.hidden) continue;
+    const fromId = nodeIdMap.get(e.from);
+    const toId = nodeIdMap.get(e.to);
+    if (!fromId || !toId) continue;
+    const style = e.style === "dashed" ? "-.->" : e.style === "dotted" ? "~~~" : "-->";
+    const label = e.label ? `|"${sanitize(e.label)}"|` : "";
+    lines.push(`  ${fromId} ${style} ${label} ${toId}`);
+  }
+
+  return lines.join("\n");
+}

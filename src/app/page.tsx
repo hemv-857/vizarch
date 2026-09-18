@@ -234,7 +234,7 @@ async function initApp(store: DiagramState) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         description: DEFAULT_DESCRIPTION,
-        style: { layout: "horizontal", theme: "light" },
+        style: { layout: "horizontal", theme: "dark" },
       }),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -252,9 +252,9 @@ async function initApp(store: DiagramState) {
       })
       .filter(Boolean) as { id: string; service: NonNullable<ReturnType<typeof resolveServiceByName>>; label?: string }[];
     const graph = buildGraphFromServices(services, tpl.edges);
-    graph.style = { ...DEFAULT_STYLE, layout: "horizontal", theme: "light" };
+    graph.style = { ...DEFAULT_STYLE, layout: "horizontal", theme: "dark" };
     layoutGraph(graph, { orientation: "horizontal" });
-    const { svg, width, height } = buildSvg(graph, { theme: "light" });
+    const { svg, width, height } = buildSvg(graph, { theme: "dark" });
     store.applyGraph(graph, svg, width, height, {
       nodeCount: graph.nodes.length,
       edgeCount: graph.edges.length,
