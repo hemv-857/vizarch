@@ -27,6 +27,44 @@ function parseGitHubUrl(url: string): { owner: string; repo: string } | null {
   return null;
 }
 
+function buildSourceMap(tree: TreeEntry[], repoInfo: { owner: string; repo: string }): Record<string, string> {
+  const sourceMap: Record<string, string> = {};
+  const baseUrl = `https://github.com/${repoInfo.owner}/${repoInfo.repo}/tree/main`;
+
+  const dirs = new Map<string, TreeEntry[]>();
+  for (const entry of tree) {
+    if (entry.type !== "blob") continue;
+    const parts = entry.path.split("/");
+    if (parts.length >= 2) {
+      const topLevel = parts[0];
+      if (!dirs.has(topLevel)) dirs.set(topLevel, []);
+      dirs.get(topLevel)!.push(entry);
+    }
+  }
+
+  for (const [dir, entries] of dirs.entries()) {
+    // Use the directory path on GitHub
+    sourceMap[dir] = `${baseUrl}/${dir}`;
+    // Also map common subdirectories
+    const subdirs = new Set<string>();
+    for (const e of entries) {
+      const parts = e.path.split("/");
+      if (parts.length > 2) subdirs.add(`${dir}/${parts[1]}`);
+    }
+    for (const sub of subdirs) {
+      sourceMap[sub] = `${baseUrl}/${sub}`;
+    }
+  }
+
+  // Map key config files
+  const configFiles = tree.filter((e) => e.type === "blob" && e.path.split("/").length === 1);
+  for (const f of configFiles) {
+    sourceMap[f.path] = `${baseUrl}/${f.path}`;
+  }
+
+  return sourceMap;
+}
+
 function treeToDescription(tree: TreeEntry[], readme: string, repoInfo: { owner: string; repo: string }): string {
   const lines: string[] = [];
 
@@ -144,12 +182,14 @@ export async function POST(req: NextRequest) {
     }
 
     const description = treeToDescription(tree, readme, repoInfo);
+    const sourceMap = buildSourceMap(tree, repoInfo);
 
     return NextResponse.json({
       ok: true,
       repo: `${repoInfo.owner}/${repoInfo.repo}`,
       fileCount: tree.filter((e) => e.type === "blob").length,
       description,
+      sourceMap,
     });
   } catch (err) {
     return NextResponse.json(

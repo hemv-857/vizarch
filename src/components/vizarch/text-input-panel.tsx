@@ -47,6 +47,7 @@ export function TextInputPanel() {
   const applyGraph = useDiagramStore((s) => s.applyGraph);
   const setError = useDiagramStore((s) => s.setError);
   const setStyle = useDiagramStore((s) => s.setStyle);
+  const setGithubSourceMap = useDiagramStore((s) => s.setGithubSourceMap);
 
   const [autoOpen, setAutoOpen] = useState(false);
   const [acItems, setAcItems] = useState<ServiceMeta[]>([]);
@@ -105,6 +106,7 @@ export function TextInputPanel() {
       toast.error("Please describe your architecture first.");
       return;
     }
+    const sourceMap = useDiagramStore.getState().githubSourceMap;
     setTemplate(null);
     useDiagramStore.setState({ status: "loading", error: null });
 
@@ -116,6 +118,7 @@ export function TextInputPanel() {
         body: JSON.stringify({
           description,
           style: { layout: store.style.layout, theme: store.style.theme },
+          sourceMap,
         }),
       });
 
@@ -156,8 +159,17 @@ export function TextInputPanel() {
       }
 
       // Fallback to non-streaming
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || `HTTP ${res.status}`);
+      const res2 = await fetch("/api/v1/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          description,
+          style: { layout: store.style.layout, theme: store.style.theme },
+          sourceMap,
+        }),
+      });
+      const data = await res2.json();
+      if (!res2.ok) throw new Error(data.message || `HTTP ${res2.status}`);
       applyGraph(data.graph, data.svg, data.width, data.height, data.meta);
       setStyle(data.graph.style ?? store.style);
       toast.success(
@@ -211,6 +223,7 @@ export function TextInputPanel() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || data.error || `HTTP ${res.status}`);
       setDescription(data.description);
+      if (data.sourceMap) setGithubSourceMap(data.sourceMap);
       setActiveTab("describe");
       toast.success(`Fetched ${data.fileCount} files from ${data.repo}`);
     } catch (err) {

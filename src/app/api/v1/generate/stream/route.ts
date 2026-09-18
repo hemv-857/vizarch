@@ -19,6 +19,7 @@ const BodySchema = z.object({
       theme: z.enum(["light", "dark"]).optional(),
     })
     .optional(),
+  sourceMap: z.record(z.string(), z.string()).optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -67,7 +68,8 @@ export async function POST(req: NextRequest) {
         send("start", { message: "Generating diagram...", timestamp: Date.now() });
         send("progress", { step: "parse", message: "Parsing architecture description..." });
 
-        const result = await generateDiagram(parsed.data as GenerateRequest);
+        const { sourceMap, ...generateReq } = parsed.data;
+        const result = await generateDiagram(generateReq as GenerateRequest, sourceMap);
 
         send("progress", { step: "layout", message: "Computing layout..." });
         send("progress", { step: "render", message: "Rendering SVG..." });

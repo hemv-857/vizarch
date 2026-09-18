@@ -84,6 +84,10 @@ interface DiagramState {
   shareSlug: string | null;
   viewingShared: boolean;   // true when loaded via ?share= slug
 
+  // GitHub source map (directory -> GitHub URL)
+  githubSourceMap: Record<string, string> | null;
+  setGithubSourceMap: (m: Record<string, string> | null) => void;
+
   // History (undo/redo)
   history: HistoryEntry[];
   historyIdx: number;            // pointer into history; -1 means no entries
@@ -290,6 +294,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   shareUrl: null,
   shareSlug: null,
   viewingShared: false,
+  githubSourceMap: null,
   history: [],
   historyIdx: -1,
 
@@ -646,6 +651,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
 
   setShare: (slug, url) => set({ shareSlug: slug, shareUrl: url }),
   setViewingShared: (v) => set({ viewingShared: v }),
+  setGithubSourceMap: (m) => set({ githubSourceMap: m }),
   forkShared: () => {
     // Clear the share slug so this is now a new diagram (user can save a new share link)
     set({

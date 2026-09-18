@@ -208,13 +208,9 @@ export function buildSvg(
     const isSelected = n.id === selectedNodeId;
     const isHovered = n.id === hoveredNodeId && !isSelected;
     const isConnectSource = n.id === connectModeFromId;
-    // Selection/hover/connect ring color
     const ringColor = isConnectSource ? "#f59e0b" : selectionRing;
     const showRing = isSelected || isHovered || isConnectSource;
-    // Card background with subtle accent stripe + soft drop shadow
-    nodeGroups.push(
-      `<g class="node${isSelected ? " selected" : ""}${isHovered ? " hovered" : ""}${isConnectSource ? " connect-source" : ""}" data-id="${escapeXml(n.id)}" data-service="${escapeXml(n.serviceId)}" transform="translate(${n.x},${n.y})" style="cursor:pointer">` +
-      (showRing ? `<rect x="-4" y="-4" width="${NODE_W + 8}" height="${NODE_H + 8}" rx="14" ry="14" fill="none" stroke="${ringColor}" stroke-width="2" stroke-opacity="${isSelected || isConnectSource ? 0.9 : 0.5}" />` : "") +
+    const nodeContent = (showRing ? `<rect x="-4" y="-4" width="${NODE_W + 8}" height="${NODE_H + 8}" rx="14" ry="14" fill="none" stroke="${ringColor}" stroke-width="2" stroke-opacity="${isSelected || isConnectSource ? 0.9 : 0.5}" />` : "") +
       `<rect width="${NODE_W}" height="${NODE_H}" rx="12" ry="12" fill="${cardBg}" stroke="${isSelected || isConnectSource ? ringColor : cardStroke}" stroke-width="${isSelected || isConnectSource ? 2 : 1.5}" />
   <rect width="6" height="${NODE_H}" rx="3" ry="3" fill="${color}" />
   <g transform="translate(${NODE_W / 2 - iconSize / 2}, 14)">
@@ -222,9 +218,15 @@ export function buildSvg(
     <path d="${n.iconPath}" fill="none" stroke="${color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" transform="scale(${iconSize / 24})" />
   </g>
   ${showLabels ? `<text x="${NODE_W / 2}" y="${NODE_H - 22}" font-family="ui-sans-serif, system-ui, sans-serif" font-size="13" font-weight="600" fill="${fg}" text-anchor="middle">${escapeXml(sanitizeText(n.label))}</text>` : ""}
-  <text x="${NODE_W / 2}" y="${NODE_H - 8}" font-family="ui-sans-serif, system-ui, sans-serif" font-size="10" fill="${subFg}" text-anchor="middle" font-weight="500">${escapeXml(n.provider)}/${escapeXml(n.type)}</text>
-</g>`,
-    );
+  <text x="${NODE_W / 2}" y="${NODE_H - 8}" font-family="ui-sans-serif, system-ui, sans-serif" font-size="10" fill="${subFg}" text-anchor="middle" font-weight="500">${escapeXml(n.provider)}/${escapeXml(n.type)}</text>`;
+    
+    const nodeGroup = `<g class="node${isSelected ? " selected" : ""}${isHovered ? " hovered" : ""}${isConnectSource ? " connect-source" : ""}" data-id="${escapeXml(n.id)}" data-service="${escapeXml(n.serviceId)}" transform="translate(${n.x},${n.y})" style="cursor:pointer">${nodeContent}</g>`;
+    
+    if (n.docLink) {
+      nodeGroups.push(`<a href="${escapeXml(n.docLink)}" target="_blank" rel="noopener noreferrer">${nodeGroup}</a>`);
+    } else {
+      nodeGroups.push(nodeGroup);
+    }
   }
 
   const defs = `<defs>

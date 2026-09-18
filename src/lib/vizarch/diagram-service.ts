@@ -15,6 +15,7 @@ export interface GenerateRequest {
   templateId?: string;
   style?: Partial<ArchStyle>;
   useCache?: boolean;
+  sourceMap?: Record<string, string>;
 }
 
 function templateToGraph(t: ArchTemplate) {
@@ -26,13 +27,14 @@ function templateToGraph(t: ArchTemplate) {
   return buildGraphFromServices(services, t.edges);
 }
 
-export async function generateDiagram(req: GenerateRequest): Promise<DiagramResult> {
+export async function generateDiagram(req: GenerateRequest, sourceMap?: Record<string, string>): Promise<DiagramResult> {
   const style: ArchStyle = { ...DEFAULT_STYLE, ...req.style };
   const styleJson = JSON.stringify(style);
+  const sourceMapKey = sourceMap ? JSON.stringify(sourceMap) : "";
 
   // Resolve source: template or description
   const descKey = req.templateId ? `tpl:${req.templateId}` : `desc:${req.description ?? ""}`;
-  const cacheKey = makeCacheKey(descKey, styleJson);
+  const cacheKey = makeCacheKey(descKey + sourceMapKey, styleJson);
 
   if (req.useCache !== false) {
     const cached = getCached(cacheKey);
@@ -63,6 +65,11 @@ export async function generateDiagram(req: GenerateRequest): Promise<DiagramResu
     throw new Error("Either description or templateId must be provided");
   }
   const parseTimeMs = Date.now() - t0;
+
+  // Apply sourceMap to nodes (GitHub directory -> URL)
+  if (sourceMap) {
+    graph = applySourceMap(graph, sourceMap);
+  }
 
   // Apply style
   graph.style = style;
@@ -114,6 +121,33 @@ export async function generateDiagram(req: GenerateRequest): Promise<DiagramResu
 
   void usedFallback;
   return result;
+}
+
+function applySourceMap(graph: ReturnType<typeof buildGraphFromServices>, sourceMap: Record<string, string>): ReturnType<typeof buildGraphFromServices> {
+  const newNodes = graph.nodes.map((node) => {
+    // Try to match node label or service name to a directory in sourceMap
+    const labelLower = node.label.toLowerCase();
+    const serviceLower = node.serviceName.toLowerCase();
+    
+    // Find best match
+    let bestMatch: string | null = null;
+    for (const [dir, url] of Object.entries(sourceMap)) {
+      const dirLower = dir.toLowerCase();
+      // Match if directory name appears in label or service name
+      if (labelLower.includes(dirLower) || serviceLower.includes(dirLower) || dirLower.includes(labelLower)) {
+        if (!bestMatch || dir.length > bestMatch.length) {
+          bestMatch = dir;
+        }
+      }
+    }
+    
+    if (bestMatch) {
+      return { ...node, docLink: sourceMap[bestMatch] };
+    }
+    return node;
+  });
+  
+  return { ...graph, nodes: newNodes };
 }
 
 export function listTemplates() {

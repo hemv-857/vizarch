@@ -25,6 +25,7 @@ const BodySchema = z.object({
     })
     .optional(),
   useCache: z.boolean().optional(),
+  sourceMap: z.record(z.string(), z.string()).optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -72,7 +73,8 @@ export async function POST(req: NextRequest) {
     );
   }
   try {
-    const result = await generateDiagram(parsed.data as GenerateRequest);
+    const { sourceMap, ...generateReq } = parsed.data;
+    const result = await generateDiagram(generateReq as GenerateRequest, sourceMap);
     return NextResponse.json(
       {
         ok: true,
