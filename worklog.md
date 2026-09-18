@@ -1181,3 +1181,101 @@ Task: Onboarding overlay, zoom-to-node, autoFit store fix, dark mode transitions
 5. **Rate limiting persistence** — use database or Redis for rate limit counters
 6. **GitHub Action / Slack bot** — integrations for CI/CD diagram generation
 7. **Performance: SVG memoization** — for 100+ node diagrams, memoize by graph hash
+
+---
+Task ID: 13
+Agent: main
+Task: Implement next phase — auto-start collab, mobile responsive, visual regression tests, rate limit persistence, GitHub/Slack integrations, SVG memoization
+
+## Current Project Status Assessment
+- vizarch is production-ready from Task 12 (onboarding, zoom-to-node, dark mode transitions)
+- ESLint: 0 errors, 0 warnings
+- Collab service: running on port 3003
+- VLM rating: 9/10
+
+## Completed Modifications
+
+### 1. Auto-start collab service with dev server (`package.json`)
+- New dev script uses `concurrently` to start both Next.js (port 3000) and collab-service (port 3003) simultaneously
+- `bun run dev` now starts both: `concurrently -n web,collab -c teal,amber "next dev -p 3000" "cd mini-services/collab-service && bun run dev"`
+- Added separate scripts: `dev:web` (Next.js only), `dev:collab` (collab only)
+- Installed `concurrently` as dev dependency
+- Verified: both services start automatically, web returns 200, collab returns 400 (expected for HTTP on socket.io)
+
+### 2. Mobile responsive — pinch-to-zoom + touch support (`diagram-canvas.tsx`)
+- New touch event handlers: `onTouchStart`, `onTouchMove`, `onTouchEnd`
+- Single finger pan: tracks touch start position, moves panX/panY on touchmove
+- Pinch zoom: two-finger pinch, calculates distance ratio, scales zoom (0.1x-5x range)
+- `style={{ touchAction: "none" }}` on the canvas wrap to prevent browser's default touch actions
+- All touch handlers disable autoFit (so the view persists after user interaction)
+- Touch state tracked via ref for performance (no re-renders on touch state change)
+
+### 3. Visual regression tests (`tests/visual-regression.test.ts`)
+- New test file that generates SVGs from all 6 templates × 2 styles (light/dark + horizontal/vertical) = 12 golden files
+- `bun run test` runs the tests (12 PASS, 0 FAIL)
+- `bun run test -- --update` regenerates golden files
+- Compares SVG string equality against golden files in `tests/golden/`
+- Saves `.actual.svg` files for failed comparisons (for diff inspection)
+- Exit code 1 on failure (CI-ready)
+- Added `"test": "bun run tests/visual-regression.test.ts"` to package.json scripts
+
+### 4. Rate limiting persistence (`prisma/schema.prisma` + `rate-limit.ts`)
+- New `RateLimit` Prisma model: id, key (unique), count, windowStart, tier
+- `rate-limit.ts` now uses L1 (in-memory) + L2 (database) caching:
+  - L1: in-memory Map for fast synchronous checks (same as before)
+  - L2: Prisma database for persistence across server restarts
+  - `persistRateLimit()` fires async (non-blocking) after each rate limit check
+  - `loadPersistedRateLimits()` loads saved counters on startup
+  - `pruneOldBuckets()` prunes both L1 cache and DB entries
+- Verified: rate limit headers still return correctly (`x-ratelimit-limit: 50`, `remaining: 49`)
+
+### 5. GitHub Action integration (`.github/workflows/vizarch-diagram.yml`)
+- New GitHub Actions workflow that triggers on PR open/edit/synchronize
+- Reads PR body for architecture description (supports ```vizarch code blocks or full body)
+- Sends POST to vizarch `/api/v1/generate` API
+- Comments the generated SVG on the PR as a collapsible code block
+- Uses `GITHUB_TOKEN` for authentication, `VIZARCH_URL` secret for custom deployment
+- Includes `jq` for JSON processing and `curl` for API calls
+
+### 6. Slack bot integration (`api/integrations/slack/route.ts`)
+- New POST endpoint at `/api/integrations/slack`
+- Accepts Slack slash command form-data (`text`, `response_url`, `user_name`)
+- Generates diagram from the text description, saves to database with shareable slug
+- Returns Slack-formatted message with "View diagram" link + node/edge counts
+- Falls back to ephemeral error message on failure
+- GET endpoint returns usage documentation
+
+### 7. SVG memoization for large diagrams (`svg-builder.ts`)
+- Cache limit increased from 50 to 100 entries (supports more diagram variations)
+- New `fastHash()` function using djb2 algorithm for large graph signatures (>500 chars)
+  - Avoids creating very long cache keys for 100+ node diagrams
+  - Hash collision probability: ~1 in 4 billion (32-bit hash)
+- Node positions rounded with `Math.round()` to reduce cache key length
+- Cache hit/miss tracking: `svgCacheHits`, `svgCacheMisses` counters
+- New `getSvgCacheStats()` function returns: size, hits, misses, hitRate (for monitoring)
+- Performance impact: eliminates redundant SVG generation for identical graph+option combos
+
+## Verification Results
+- ESLint: 0 errors, 0 warnings
+- Visual regression tests: 12 passed, 0 failed ✓
+- Dev server: all routes 200, no runtime errors ✓
+- Collab service: auto-started via `bun run dev` (concurrently) ✓
+- Rate limiting: headers present, DB persistence wired ✓
+- Slack endpoint: GET returns documentation ✓
+- GitHub Action: workflow file created, ready for CI/CD ✓
+- Agent Browser: 12 nodes visible, no errors ✓
+- VLM final rating: 9/10 ("Clean layout, clear hierarchy, high confidence")
+
+## Unresolved Issues / Risks
+- **No auth/tiers yet**: All users are "free" tier. Rate limiting is IP-based, not user-based.
+- **Collab service in production**: `concurrently` is for dev. For production, use PM2 or Docker.
+- **Slack bot verification**: Not yet verified with a real Slack workspace (needs Slack app configuration).
+- **GitHub Action verification**: Not yet tested with a real GitHub repo (needs repo setup + secrets).
+
+## Priority Recommendations for Next Phase
+1. **Auth + user accounts** — NextAuth.js for Pro/Enterprise tier enforcement
+2. **Slack bot real-world testing** — configure Slack app and verify end-to-end
+3. **GitHub Action real-world testing** — set up in a real repo and verify
+4. **Mobile layout improvements** — responsive sidebar (drawer on mobile), touch-friendly buttons
+5. **WebSocket auto-reconnect** — handle disconnects and reconnects gracefully
+6. **Performance: pre-warm cache on startup** — warm the SVG memoization cache with template diagrams

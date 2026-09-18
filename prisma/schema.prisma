@@ -71,3 +71,14 @@ model NodeAnnotation {
 
   @@index([diagramSlug, nodeId])
 }
+
+// vizarch: rate limit counters (persisted across server restarts)
+model RateLimit {
+  id          String   @id @default(cuid())
+  key         String   @unique  // ip:endpoint:tier
+  count       Int      @default(0)
+  windowStart DateTime @default(now())
+  tier        String   @default("free")
+
+  @@index([key])
+}

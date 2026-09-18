@@ -96,6 +96,65 @@ export function DiagramCanvas() {
     [zoom, setZoom],
   );
 
+  // Touch pinch-zoom + pan support
+  const touchStateRef = useRef<{ mode: "none" | "pan" | "pinch"; startDist: number; startZoom: number; startPanX: number; startPanY: number; startX: number; startY: number }>({
+    mode: "none", startDist: 0, startZoom: 1, startPanX: 0, startPanY: 0, startX: 0, startY: 0,
+  });
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      // Single finger pan
+      touchStateRef.current = {
+        mode: "pan",
+        startDist: 0,
+        startZoom: zoom,
+        startPanX: panX,
+        startPanY: panY,
+        startX: e.touches[0].clientX,
+        startY: e.touches[0].clientY,
+      };
+      storeSetAutoFit(false);
+    } else if (e.touches.length === 2) {
+      // Pinch zoom
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      touchStateRef.current = {
+        mode: "pinch",
+        startDist: dist,
+        startZoom: zoom,
+        startPanX: panX,
+        startPanY: panY,
+        startX: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+        startY: (e.touches[0].clientY + e.touches[1].clientY) / 2,
+      };
+      storeSetAutoFit(false);
+    }
+  };
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    const ts = touchStateRef.current;
+    if (ts.mode === "pan" && e.touches.length === 1) {
+      e.preventDefault();
+      const dx = e.touches[0].clientX - ts.startX;
+      const dy = e.touches[0].clientY - ts.startY;
+      setPan(ts.startPanX + dx, ts.startPanY + dy);
+    } else if (ts.mode === "pinch" && e.touches.length === 2) {
+      e.preventDefault();
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (ts.startDist > 0) {
+        const scale = dist / ts.startDist;
+        setZoom(Math.max(0.1, Math.min(5, ts.startZoom * scale)));
+      }
+    }
+  };
+
+  const onTouchEnd = () => {
+    touchStateRef.current = { mode: "none", startDist: 0, startZoom: 1, startPanX: 0, startPanY: 0, startX: 0, startY: 0 };
+  };
+
   const onMouseDown = (e: React.MouseEvent) => {
     // Check if clicking on a node → start node drag
     const target = e.target as Element;
@@ -332,6 +391,10 @@ export function DiagramCanvas() {
         onMouseDown={onMouseDown}
         onMouseMove={onMouseMove}
         onWheel={onWheel}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+        style={{ touchAction: "none" }}
       >
         {isLoading && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-muted-foreground">
