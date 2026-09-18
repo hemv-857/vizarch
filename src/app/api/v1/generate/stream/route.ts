@@ -11,7 +11,7 @@ const BodySchema = z.object({
   style: z
     .object({
       colorMode: z.enum(["type", "brand", "custom"]).optional(),
-      layout: z.enum(["auto", "horizontal", "vertical", "hierarchical"]).optional(),
+      layout: z.enum(["auto", "horizontal", "vertical", "hierarchical", "flowchart"]).optional(),
       iconSize: z.enum(["sm", "md", "lg"]).optional(),
       showLabels: z.boolean().optional(),
       showEdgeLabels: z.boolean().optional(),

@@ -270,10 +270,10 @@ export function layoutFlowchart(
     adj.get(e.to)?.add(e.from); // undirected for force layout
   }
 
-  // Initialize positions in a rough circle
+  // Initialize positions in a compact circle
   const centerX = 0;
   const centerY = 0;
-  const radius = Math.max(nodes.length * 30, 200);
+  const radius = Math.max(nodes.length * 15, 120); // tighter initial radius
   for (let i = 0; i < nodes.length; i++) {
     const angle = (i / nodes.length) * 2 * Math.PI;
     const n = nodes[i];
@@ -283,10 +283,10 @@ export function layoutFlowchart(
   }
 
   // Force-directed layout (simple Fruchterman-Reingold style)
-  const iterations = 80;
-  const k = radius * 0.8; // optimal distance
-  const temp = radius;
-  const damping = 0.9;
+  const iterations = 60;
+  const k = radius * 0.5; // smaller optimal distance
+  const temp = radius * 0.5;
+  const damping = 0.85;
 
   for (let iter = 0; iter < iterations; iter++) {
     const forces = new Map<string, { x: number; y: number }>();
@@ -300,7 +300,7 @@ export function layoutFlowchart(
         const dx = a.x - b.x;
         const dy = a.y - b.y;
         const dist = Math.sqrt(dx * dx + dy * dy) || 0.1;
-        const force = (k * k) / dist;
+        const force = Math.min((k * k) / dist, 500); // cap repulsion force
         const fx = (force * dx) / dist;
         const fy = (force * dy) / dist;
         const fa = forces.get(a.id)!;
@@ -319,7 +319,7 @@ export function layoutFlowchart(
       const dx = b.x - a.x;
       const dy = b.y - a.y;
       const dist = Math.sqrt(dx * dx + dy * dy) || 0.1;
-      const force = (dist * dist) / k;
+      const force = Math.min((dist * dist) / k, 500); // cap attraction force
       const fx = (force * dx) / dist;
       const fy = (force * dy) / dist;
       const fa = forces.get(a.id)!;
@@ -328,7 +328,7 @@ export function layoutFlowchart(
       fb.x += fx; fb.y += fy;
     }
 
-    // Apply forces with temperature
+    // Apply forces with temperature cooling
     const t = temp * (1 - iter / iterations);
     for (const n of nodes) {
       const f = forces.get(n.id)!;
@@ -349,7 +349,7 @@ export function layoutFlowchart(
   }
   const width = maxX - minX;
   const height = maxY - minY;
-  const pad = 80;
+  const pad = 60;
 
   for (const n of nodes) {
     n.x = n.x - minX + pad;
