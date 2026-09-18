@@ -83,6 +83,7 @@ export async function generateDiagram(req: GenerateRequest, sourceMap?: Record<s
         ? ("vertical" as const)
         : ("horizontal" as const),
     layerAssignment: style.layerAssignment,
+    layoutMode: style.layout === "flowchart" ? ("flowchart" as const) : ("sugiyama" as const),
   };
 
   const t1 = Date.now();

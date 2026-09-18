@@ -14,6 +14,7 @@ export interface LayoutOptions {
   nodeGap: number;     // horizontal gap between nodes in same layer
   orientation: "horizontal" | "vertical"; // horizontal = LR, vertical = TB
   layerAssignment?: Record<string, number>;
+  layoutMode?: "sugiyama" | "flowchart"; // sugiyama = hierarchical, flowchart = force-directed
 }
 
 export const DEFAULT_LAYOUT_OPTIONS: LayoutOptions = {
@@ -22,6 +23,7 @@ export const DEFAULT_LAYOUT_OPTIONS: LayoutOptions = {
   layerGap: 96,
   nodeGap: 40,
   orientation: "horizontal",
+  layoutMode: "sugiyama",
 };
 
 interface LayoutInternal {
@@ -216,6 +218,9 @@ export function layoutGraph(
   optsIn?: Partial<LayoutOptions>,
 ): { width: number; height: number } {
   const opts: LayoutOptions = { ...DEFAULT_LAYOUT_OPTIONS, ...optsIn };
+  if (opts.layoutMode === "flowchart") {
+    return layoutFlowchart(graph, opts);
+  }
   const internal = assignLayers(graph, opts);
   orderLayers(graph, internal);
   return assignCoordinates(graph, internal, opts);
@@ -244,4 +249,112 @@ export function getGraphBounds(graph: ArchGraph): {
   }
   if (!isFinite(minX)) return { minX: 0, minY: 0, maxX: 0, maxY: 0 };
   return { minX, minY, maxX, maxY };
+}
+
+// Flowchart layout: force-directed organic layout for natural flow diagrams
+export function layoutFlowchart(
+  graph: ArchGraph,
+  opts: LayoutOptions,
+): { width: number; height: number } {
+  const nodes = graph.nodes.filter((n) => !n.hidden);
+  const nodeMap = new Map<string, ArchNode>(nodes.map((n) => [n.id, n]));
+
+  if (nodes.length === 0) return { width: 100, height: 100 };
+
+  // Build adjacency
+  const adj = new Map<string, Set<string>>();
+  for (const n of nodes) adj.set(n.id, new Set());
+  for (const e of graph.edges) {
+    if (e.hidden) continue;
+    adj.get(e.from)?.add(e.to);
+    adj.get(e.to)?.add(e.from); // undirected for force layout
+  }
+
+  // Initialize positions in a rough circle
+  const centerX = 0;
+  const centerY = 0;
+  const radius = Math.max(nodes.length * 30, 200);
+  for (let i = 0; i < nodes.length; i++) {
+    const angle = (i / nodes.length) * 2 * Math.PI;
+    const n = nodes[i];
+    n.x = centerX + radius * Math.cos(angle);
+    n.y = centerY + radius * Math.sin(angle);
+    n.layer = 0;
+  }
+
+  // Force-directed layout (simple Fruchterman-Reingold style)
+  const iterations = 80;
+  const k = radius * 0.8; // optimal distance
+  const temp = radius;
+  const damping = 0.9;
+
+  for (let iter = 0; iter < iterations; iter++) {
+    const forces = new Map<string, { x: number; y: number }>();
+    nodes.forEach((n) => forces.set(n.id, { x: 0, y: 0 }));
+
+    // Repulsion between all nodes
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        const a = nodes[i];
+        const b = nodes[j];
+        const dx = a.x - b.x;
+        const dy = a.y - b.y;
+        const dist = Math.sqrt(dx * dx + dy * dy) || 0.1;
+        const force = (k * k) / dist;
+        const fx = (force * dx) / dist;
+        const fy = (force * dy) / dist;
+        const fa = forces.get(a.id)!;
+        const fb = forces.get(b.id)!;
+        fa.x += fx; fa.y += fy;
+        fb.x -= fx; fb.y -= fy;
+      }
+    }
+
+    // Attraction along edges
+    for (const e of graph.edges) {
+      if (e.hidden) continue;
+      const a = nodeMap.get(e.from);
+      const b = nodeMap.get(e.to);
+      if (!a || !b) continue;
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const dist = Math.sqrt(dx * dx + dy * dy) || 0.1;
+      const force = (dist * dist) / k;
+      const fx = (force * dx) / dist;
+      const fy = (force * dy) / dist;
+      const fa = forces.get(a.id)!;
+      const fb = forces.get(b.id)!;
+      fa.x -= fx; fa.y -= fy;
+      fb.x += fx; fb.y += fy;
+    }
+
+    // Apply forces with temperature
+    const t = temp * (1 - iter / iterations);
+    for (const n of nodes) {
+      const f = forces.get(n.id)!;
+      const fx = Math.max(-t, Math.min(t, f.x));
+      const fy = Math.max(-t, Math.min(t, f.y));
+      n.x += fx * damping;
+      n.y += fy * damping;
+    }
+  }
+
+  // Center and normalize
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const n of nodes) {
+    minX = Math.min(minX, n.x);
+    minY = Math.min(minY, n.y);
+    maxX = Math.max(maxX, n.x);
+    maxY = Math.max(maxY, n.y);
+  }
+  const width = maxX - minX;
+  const height = maxY - minY;
+  const pad = 80;
+
+  for (const n of nodes) {
+    n.x = n.x - minX + pad;
+    n.y = n.y - minY + pad;
+  }
+
+  return { width: width + 2 * pad, height: height + 2 * pad };
 }

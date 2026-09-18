@@ -41,7 +41,7 @@ export interface ArchGraph {
 
 export interface ArchStyle {
   colorMode: "type" | "brand" | "custom";
-  layout: "auto" | "horizontal" | "vertical" | "hierarchical";
+  layout: "auto" | "horizontal" | "vertical" | "hierarchical" | "flowchart";
   iconSize: "sm" | "md" | "lg";
   showLabels: boolean;
   showEdgeLabels: boolean;

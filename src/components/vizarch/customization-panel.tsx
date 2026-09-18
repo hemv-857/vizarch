@@ -39,6 +39,7 @@ const PALETTE = [
 
 const LAYOUTS: { label: string; value: ArchStyle["layout"]; hint: string }[] = [
   { label: "Auto (TD)", value: "auto", hint: "Sugiyama hierarchical, top→down" },
+  { label: "Flowchart", value: "flowchart", hint: "Force-directed organic flow (Excalidraw-style)" },
   { label: "Linear LR", value: "horizontal", hint: "Left-to-right flow" },
   { label: "Top-Down", value: "vertical", hint: "Stacked top-to-bottom" },
   { label: "Hierarchical", value: "hierarchical", hint: "Custom layer assignment" },
@@ -154,7 +155,7 @@ export function CustomizationPanel() {
           <TabsContent value="layout" className="mt-3 space-y-3">
             <div className="space-y-1.5">
               <Label className="text-[11px] text-muted-foreground">Layout direction</Label>
-              <div className="grid grid-cols-2 gap-1.5">
+              <div className="grid grid-cols-3 gap-1.5">
                 {LAYOUTS.map((l) => (
                   <button
                     key={l.value}
