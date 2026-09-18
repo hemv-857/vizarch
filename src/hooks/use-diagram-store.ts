@@ -255,6 +255,7 @@ function applyDarkModeClass(dark: boolean) {
   else root.classList.remove("dark");
 }
 
+export type { DiagramState };
 export const useDiagramStore = create<DiagramState>((set, get) => ({
   description: "",
   templateId: null,

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Share2, GitFork } from "lucide-react";
 import { useDiagramStore } from "@/hooks/use-diagram-store";
+import type { DiagramState } from "@/hooks/use-diagram-store";
 import { buildSvg } from "@/lib/vizarch/svg-builder";
 import { layoutGraph } from "@/lib/vizarch/layout-engine";
 import { getTemplateById } from "@/lib/vizarch/templates";
@@ -174,7 +175,7 @@ export default function Home() {
   );
 }
 
-async function initApp(store: ReturnType<typeof useDiagramStore>) {
+async function initApp(store: DiagramState) {
   // 1) If a share slug is in the URL, load the saved diagram instead.
   const url = new URL(window.location.href);
   const shareSlug = url.searchParams.get("share");

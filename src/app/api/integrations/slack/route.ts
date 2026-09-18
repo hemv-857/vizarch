@@ -1,15 +1,52 @@
 // POST /api/integrations/slack — Slack slash command endpoint
 // Usage: /vizarch describe your system architecture
 // Returns: ephemeral message with diagram link
+//
+// Security: validates Slack request signature (v0) when SLACK_SIGNING_SECRET is set.
 
 import { NextRequest, NextResponse } from "next/server";
 import { generateDiagram } from "@/lib/vizarch/diagram-service";
 import { db } from "@/lib/db";
+import { createHmac, timingSafeEqual } from "crypto";
 
 export const runtime = "nodejs";
 
+const SLACK_SECRET = process.env.SLACK_SIGNING_SECRET;
+
+async function verifySlackSignature(
+  body: string,
+  timestamp: string,
+  signature: string,
+): Promise<boolean> {
+  if (!SLACK_SECRET) return true; // Skip if not configured (dev mode)
+  if (!timestamp || !signature) return false;
+
+  // Reject requests older than 5 minutes (replay protection)
+  const age = Math.abs(Date.now() / 1000 - parseInt(timestamp, 10));
+  if (age > 300) return false;
+
+  const basestring = `v0:${timestamp}:${body}`;
+  const hmac = createHmac("sha256", SLACK_SECRET).update(basestring).digest("hex");
+  const expected = `v0=${hmac}`;
+  try {
+    return timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
+  } catch {
+    return false;
+  }
+}
+
 export async function POST(req: NextRequest) {
-  const formData = await req.formData();
+  // Verify Slack signature if configured
+  const rawBody = await req.text();
+  if (SLACK_SECRET) {
+    const timestamp = req.headers.get("x-slack-request-timestamp") ?? "";
+    const signature = req.headers.get("x-slack-signature") ?? "";
+    if (!(await verifySlackSignature(rawBody, timestamp, signature))) {
+      return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+    }
+  }
+
+  const formData = await new Response(rawBody).formData();
   const text = formData.get("text") as string;
   const responseUrl = formData.get("response_url") as string;
   const userName = formData.get("user_name") as string;

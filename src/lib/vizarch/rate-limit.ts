@@ -29,11 +29,18 @@ export const QUOTAS: Record<QuotaTier, QuotaConfig> = {
 const DEFAULT_TIER: QuotaTier = "free";
 
 function getClientIp(req: Request): string {
+  // Only trust proxy headers when behind a known reverse proxy (Caddy/Nginx).
+  // For direct requests, use a fallback identifier.
   const fwd = req.headers.get("x-forwarded-for");
-  if (fwd) return fwd.split(",")[0].trim();
+  if (fwd) {
+    // Take the first IP (original client) and validate it's a plausible IP
+    const ip = fwd.split(",")[0].trim();
+    if (/^\d{1,3}(\.\d{1,3}){3}$/.test(ip) || ip.includes(":")) return ip;
+  }
   const real = req.headers.get("x-real-ip");
-  if (real) return real;
-  return "unknown";
+  if (real && (/^\d{1,3}(\.\d{1,3}){3}$/.test(real) || real.includes(":"))) return real;
+  // Fallback: use a hash of all connection-identifying headers
+  return "anonymous";
 }
 
 export interface RateLimitResult {

@@ -33,6 +33,14 @@ function escapeXml(s: string): string {
     .replace(/'/g, "&apos;");
 }
 
+// Strip any HTML/script tags from user-provided text before SVG insertion
+function sanitizeText(s: string): string {
+  return s
+    .replace(/<[^>]*>/g, "") // strip HTML tags
+    .replace(/javascript:/gi, "") // strip JS URIs
+    .replace(/on\w+\s*=/gi, ""); // strip event handlers
+}
+
 function nodeColor(node: ArchNode, style?: ArchStyle): string {
   if (style?.colorMode === "brand" && node.brandColor) return node.brandColor;
   if (style?.colorMode === "custom" && style.nodeColors?.[node.id]) {
@@ -188,7 +196,7 @@ export function buildSvg(
       const labelW = Math.max(60, e.label.length * 6.5 + 16);
       const labelH = 18;
       edgeLabels.push(
-        `<g pointer-events="none"><rect x="${midX - labelW / 2}" y="${midY - labelH / 2}" width="${labelW}" height="${labelH}" rx="${labelH / 2}" fill="${bg}" stroke="${color}" stroke-width="1" stroke-opacity="0.5" /><text x="${midX}" y="${midY + 4}" font-family="ui-sans-serif, system-ui, sans-serif" font-size="11" fill="${color}" text-anchor="middle" font-weight="600">${escapeXml(e.label)}</text></g>`,
+        `<g pointer-events="none"><rect x="${midX - labelW / 2}" y="${midY - labelH / 2}" width="${labelW}" height="${labelH}" rx="${labelH / 2}" fill="${bg}" stroke="${color}" stroke-width="1" stroke-opacity="0.5" /><text x="${midX}" y="${midY + 4}" font-family="ui-sans-serif, system-ui, sans-serif" font-size="11" fill="${color}" text-anchor="middle" font-weight="600">${escapeXml(sanitizeText(e.label))}</text></g>`,
       );
     }
   }
@@ -213,7 +221,7 @@ export function buildSvg(
     <rect width="${iconSize}" height="${iconSize}" rx="${iconSize / 4}" fill="${color}22" />
     <path d="${n.iconPath}" fill="none" stroke="${color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" transform="scale(${iconSize / 24})" />
   </g>
-  ${showLabels ? `<text x="${NODE_W / 2}" y="${NODE_H - 22}" font-family="ui-sans-serif, system-ui, sans-serif" font-size="13" font-weight="600" fill="${fg}" text-anchor="middle">${escapeXml(n.label)}</text>` : ""}
+  ${showLabels ? `<text x="${NODE_W / 2}" y="${NODE_H - 22}" font-family="ui-sans-serif, system-ui, sans-serif" font-size="13" font-weight="600" fill="${fg}" text-anchor="middle">${escapeXml(sanitizeText(n.label))}</text>` : ""}
   <text x="${NODE_W / 2}" y="${NODE_H - 8}" font-family="ui-sans-serif, system-ui, sans-serif" font-size="10" fill="${subFg}" text-anchor="middle" font-weight="500">${escapeXml(n.provider)}/${escapeXml(n.type)}</text>
 </g>`,
     );
