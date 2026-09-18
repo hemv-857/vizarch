@@ -38,7 +38,7 @@ const PALETTE = [
 ];
 
 const LAYOUTS: { label: string; value: ArchStyle["layout"]; hint: string }[] = [
-  { label: "Auto (LR)", value: "auto", hint: "Sugiyama hierarchical, left→right" },
+  { label: "Auto (TD)", value: "auto", hint: "Sugiyama hierarchical, top→down" },
   { label: "Linear LR", value: "horizontal", hint: "Left-to-right flow" },
   { label: "Top-Down", value: "vertical", hint: "Stacked top-to-bottom" },
   { label: "Hierarchical", value: "hierarchical", hint: "Custom layer assignment" },

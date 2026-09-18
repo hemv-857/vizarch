@@ -1,7 +1,3 @@
-<p align="center">
-  <img src="public/logo.svg" alt="vizarch" width="48" height="48">
-</p>
-
 <h1 align="center">vizarch</h1>
 
 <p align="center">

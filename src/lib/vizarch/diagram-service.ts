@@ -79,7 +79,7 @@ export async function generateDiagram(req: GenerateRequest, sourceMap?: Record<s
 
   const layoutOpts = {
     orientation:
-      style.layout === "vertical" || style.layout === "hierarchical"
+      style.layout === "vertical" || style.layout === "hierarchical" || style.layout === "auto"
         ? ("vertical" as const)
         : ("horizontal" as const),
     layerAssignment: style.layerAssignment,
