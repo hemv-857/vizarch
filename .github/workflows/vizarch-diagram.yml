@@ -9,6 +9,12 @@ on:
 jobs:
   generate-diagram:
     runs-on: ubuntu-latest
+    # The deployed vizarch.app does not currently serve POST /api/v1/generate:
+    # the host 307-redirects to www, which returns the SPA shell for every path
+    # (including made-up ones) and 405 for POST. So this job fails on every PR.
+    # A diagram comment should never gate a merge, and the outage is already
+    # tracked by the deployment, so it is non-blocking until the API is back.
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - name: Generate diagram from PR description
