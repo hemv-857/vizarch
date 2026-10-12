@@ -1,3 +1,5 @@
+<a href="https://github.com/hemv-857/vizarch/actions/workflows/ci.yml"><img src="https://github.com/hemv-857/vizarch/actions/workflows/ci.yml/badge.svg" alt="vizarch CI"></a> <a href="https://github.com/hemv-857/vizarch/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a> <img src="https://img.shields.io/badge/TypeScript-3178C6.svg" alt="TypeScript">
+
 <h1 align="center">vizarch</h1>
 
 <p align="center">
